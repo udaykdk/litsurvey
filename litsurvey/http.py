@@ -1,0 +1,110 @@
+"""Tiny HTTP layer: per-host rate limits, retries with Retry-After, debug tracing."""
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+from . import __version__
+from .config import DATA_DIR
+
+USER_AGENT = f"litsurvey/{__version__} (https://github.com/udaykdk/litsurvey)"
+
+# minimum seconds between requests to a host, per the providers' published limits
+HOST_INTERVAL = {
+    "api.semanticscholar.org": 1.1,   # 1 request/second with a key; shared pool without
+    "export.arxiv.org": 3.0,          # arXiv asks for 3 s between requests
+    "api.openalex.org": 0.15,
+    "api.unpaywall.org": 0.2,
+}
+_last_call = {}
+DEBUG = False
+
+
+def _throttle(host):
+    """Space requests per host, both within this process and across processes
+    (CLI and web page running together) via a timestamp file's mtime."""
+    interval = HOST_INTERVAL.get(host, 0.0)
+    if not interval:
+        return
+    stamp = os.path.join(DATA_DIR, ".ratelimit-" + host)
+    try:
+        last_file = os.stat(stamp).st_mtime
+    except OSError:
+        last_file = 0.0
+    wait = max(_last_call.get(host, 0.0) + interval - time.monotonic(),
+               last_file + interval - time.time())
+    if wait > 0:
+        time.sleep(min(wait, interval))
+    _last_call[host] = time.monotonic()
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(stamp, "a"):
+            pass
+        os.utime(stamp, None)
+    except OSError:
+        pass
+
+
+def _retry_after(err, attempt):
+    try:
+        ra = err.headers.get("Retry-After") if err.headers else None
+        if ra:
+            return min(float(ra), 60.0)
+    except (TypeError, ValueError):
+        pass
+    return float(2 ** (attempt + 1))
+
+
+def get(url, headers=None, timeout=30, retries=4):
+    """GET url and return the raw bytes. Retries 429/5xx and network errors."""
+    host = urllib.parse.urlparse(url).netloc
+    hdrs = {"User-Agent": USER_AGENT}
+    hdrs.update(headers or {})
+    last = None
+    for attempt in range(retries):
+        _throttle(host)
+        if DEBUG:
+            print(f"[http] GET {url}", file=sys.stderr)
+        try:
+            req = urllib.request.Request(url, headers=hdrs)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code in (429, 500, 502, 503, 504) and attempt < retries - 1:
+                wait = _retry_after(e, attempt)
+                print(f"[warn] HTTP {e.code} from {host}, retrying in {wait:.0f}s",
+                      file=sys.stderr)
+                time.sleep(wait)
+                continue
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            last = e
+            if attempt < retries - 1:
+                time.sleep(2 ** (attempt + 1))
+                continue
+            raise
+    raise last  # pragma: no cover
+
+
+def get_json(url, headers=None, timeout=30):
+    return json.loads(get(url, headers=headers, timeout=timeout).decode("utf-8"))
+
+
+def post_json(url, payload, headers=None, timeout=900):
+    """POST a JSON body and return the decoded JSON reply (used for LLM backends)."""
+    hdrs = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
+    hdrs.update(headers or {})
+    data = json.dumps(payload).encode("utf-8")
+    if DEBUG:
+        print(f"[http] POST {url} ({len(data)} bytes)", file=sys.stderr)
+    req = urllib.request.Request(url, data=data, headers=hdrs)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")[:500]
+        raise RuntimeError(f"HTTP {e.code} from {url}: {body}") from None

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>litsurvey</title>
+<style>
+  :root { --bg:#fafaf7; --fg:#1d1d1b; --muted:#6b6b66; --line:#d9d9d2; --accent:#0b5fa5; --ok:#1e7b3a; --warn:#b3540a; --card:#fff; }
+  body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; align-items:baseline; gap:18px; padding:14px 22px; border-bottom:1px solid var(--line); background:#fff; }
+  header h1 { font-size:20px; margin:0; } header .v { color:var(--muted); font-size:13px; }
+  nav button { background:none; border:none; font-size:15px; padding:6px 10px; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; }
+  nav button.on { color:var(--fg); border-color:var(--accent); }
+  main { max-width:1100px; margin:0 auto; padding:18px 22px 60px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin-bottom:16px; }
+  fieldset { border:none; padding:0; margin:0 0 10px; }
+  .modes { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:6px 14px; }
+  .modes label { display:flex; gap:8px; align-items:flex-start; cursor:pointer; }
+  .modes small { display:block; color:var(--muted); }
+  .grp { font-weight:600; margin:10px 0 4px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  textarea, input[type=text], input[type=number], select { font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--fg); }
+  textarea { width:100%; box-sizing:border-box; min-height:64px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:flex-end; margin-top:10px; }
+  .row label { display:flex; flex-direction:column; font-size:13px; color:var(--muted); gap:3px; }
+  button.primary { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:9px 18px; font:inherit; cursor:pointer; }
+  button.primary:disabled { opacity:.5; cursor:default; }
+  button.small { font:13px inherit; padding:5px 10px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
+  .note { padding:8px 12px; border-radius:6px; font-size:14px; margin-top:12px; }
+  .note.ok { background:#e8f5ec; color:var(--ok); } .note.warn { background:#fff1e3; color:var(--warn); } .note.info { background:#e9f1fb; color:var(--accent); }
+  pre.progress { background:#1f2328; color:#d6dde6; padding:10px 12px; border-radius:6px; font-size:13px; max-height:220px; overflow:auto; white-space:pre-wrap; }
+  .paper { padding:10px 0; border-bottom:1px solid var(--line); }
+  .paper:last-child { border-bottom:none; }
+  .paper .t { font-weight:600; } .paper .m { color:var(--muted); font-size:13px; }
+  .paper .abs { font-size:13px; margin-top:4px; color:#3a3a37; }
+  code { background:#f1f1ec; padding:1px 5px; border-radius:4px; font-size:13px; }
+  .md h2 { font-size:19px; margin:18px 0 8px; } .md h3 { font-size:16px; margin:14px 0 6px; }
+  .md table { border-collapse:collapse; font-size:13px; margin:8px 0; } .md td, .md th { border:1px solid var(--line); padding:4px 8px; vertical-align:top; }
+  .md blockquote { border-left:3px solid var(--line); margin:6px 0; padding:2px 10px; color:var(--muted); }
+  table.hist { width:100%; border-collapse:collapse; font-size:14px; }
+  table.hist th, table.hist td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
+  table.hist tr:hover td { background:#f4f4ef; cursor:pointer; }
+  .dl { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .hidden { display:none; }
+  .muted { color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>litsurvey</h1><span class="v">v{{VERSION}} · local literature search</span>
+  <nav><button id="tabRun" class="on">Run</button><button id="tabHist">History</button></nav>
+</header>
+<main>
+<section id="run">
+  <div class="card">
+    <form id="form" onsubmit="return false;">
+      <div class="grp">Search &amp; lookup (no LLM involved)</div>
+      <div class="modes">
+        <label><input type="radio" name="mode" value="search" checked><span>Search<small>keyword search across OpenAlex, Semantic Scholar, arXiv</small></span></label>
+        <label><input type="radio" name="mode" value="paper"><span>Paper<small>details of one paper by ID / DOI / arXiv</small></span></label>
+        <label><input type="radio" name="mode" value="cites"><span>Cites<small>papers that cite a given paper</small></span></label>
+        <label><input type="radio" name="mode" value="refs"><span>Refs<small>papers a given paper cites</small></span></label>
+        <label><input type="radio" name="mode" value="related"><span>Related<small>similar papers (recommendation engine)</small></span></label>
+        <label><input type="radio" name="mode" value="oa"><span>Open access<small>legal free copy of a DOI (Unpaywall)</small></span></label>
+      </div>
+      <div class="grp">LLM agent (needs a backend)</div>
+      <div class="modes">
+        <label><input type="radio" name="mode" value="novelty"><span>Novelty<small>prior-art verdict for a claim</small></span></label>
+        <label><input type="radio" name="mode" value="research"><span>Research<small>cited state-of-the-art survey for a question</small></span></label>
+      </div>
+      <div class="row" style="margin-top:14px"><label style="flex:1"><span id="inLabel">Keyword query</span><textarea id="text" placeholder="e.g. physics informed neural networks inverse problems"></textarea></label></div>
+      <div class="row">
+        <label id="optN">Max results<input type="number" id="n" value="15" min="1" max="100" style="width:80px"></label>
+        <label id="optYear">From year<input type="number" id="year" placeholder="any" style="width:90px"></label>
+        <label id="optBackend">Backend<select id="backend"><option value="">auto</option><option value="ollama">ollama (local)</option><option value="openai">openai-compatible</option><option value="anthropic">anthropic</option></select></label>
+        <label id="optModel">Model<input type="text" id="model" list="models" placeholder="default" style="width:200px"><datalist id="models"></datalist></label>
+        <label id="optRounds">Max rounds<input type="number" id="rounds" value="8" min="1" max="30" style="width:70px"></label>
+        <label style="flex:1">Output file (optional; extension picks format: .bib .ris .csv .json .md)<input type="text" id="out" placeholder="/absolute/path/results.bib"></label>
+        <button class="primary" id="go">Run</button>
+      </div>
+      <div id="privacy" class="note ok"></div>
+    </form>
+  </div>
+  <div id="status" class="card hidden">
+    <div id="statusLine" class="muted"></div>
+    <pre id="progress" class="progress hidden"></pre>
+  </div>
+  <div id="result" class="card hidden"></div>
+</section>
+<section id="hist" class="hidden">
+  <div class="card">
+    <div class="row" style="margin-top:0;justify-content:space-between"><strong>Past runs</strong><span class="muted">stored in ~/.litsurvey/runs</span></div>
+    <table class="hist"><thead><tr><th>time</th><th>mode</th><th>input</th><th>results</th><th></th></tr></thead><tbody id="histBody"></tbody></table>
+  </div>
+  <div id="histResult" class="card hidden"></div>
+</section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const LABELS = {search:"Keyword query", paper:"Paper ID (Semantic Scholar hash, DOI:10.…, or ARXIV:2404.19756)",
+  cites:"Paper ID to find citing papers for", refs:"Paper ID to list references of", related:"Paper ID to find similar papers for",
+  oa:"DOI", novelty:"Claim, phrased as a generic topic (never a sentence from the manuscript)", research:"Research question"};
+const AGENT = new Set(["novelty","research"]);
+let CONFIG = {};
+
+function mode(){ return document.querySelector('input[name=mode]:checked').value; }
+function esc(s){ return String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function refreshForm(){
+  const m = mode(); $("inLabel").textContent = LABELS[m];
+  const isAgent = AGENT.has(m);
+  $("optN").classList.toggle("hidden", isAgent || m==="oa" || m==="paper");
+  $("optYear").classList.toggle("hidden", m!=="search");
+  for (const id of ["optBackend","optModel","optRounds"]) $(id).classList.toggle("hidden", !isAgent);
+  $("rounds").value = m==="research" ? 12 : 8;
+  const p = $("privacy");
+  if (!isAgent) { p.className="note ok"; p.textContent = m==="oa" ? "No LLM involved. Only the DOI is sent to Unpaywall." : "No LLM involved. Only this query or ID is sent to the scholarly APIs (OpenAlex, Semantic Scholar, arXiv)."; return; }
+  const be = $("backend").value || CONFIG.backend || "auto";
+  const local = be==="ollama" || (be==="auto" && CONFIG.ollama);
+  if (local) { p.className="note ok"; p.textContent = "Local backend (Ollama). Your text stays on this machine; only the generic keyword queries the model composes are sent to the scholarly APIs."; }
+  else if (be==="auto") { p.className="note warn"; p.textContent = "No local backend detected. If a cloud key is configured, your text WILL be sent to that provider. Start Ollama for a fully local run."; }
+  else { p.className="note warn"; p.textContent = `Cloud backend (${be}): your claim/question text will be sent to that provider. Do not use for confidential manuscript content.`; }
+}
+document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener("change", refreshForm));
+$("backend").addEventListener("change", refreshForm);
+
+async function loadConfig(){
+  try { CONFIG = await (await fetch("/api/config")).json(); } catch(e){ CONFIG = {}; }
+  $("models").innerHTML = (CONFIG.ollama_models||[]).map(m=>`<option value="${esc(m)}">`).join("");
+  if (CONFIG.model) $("model").placeholder = CONFIG.model;
+  refreshForm();
+}
+
+function paperHtml(p, i){
+  const au = (p.authors||[]).slice(0,3).join(", ") + ((p.authors||[]).length>3?" et al.":"");
+  return `<div class="paper"><div class="t">${i}. <a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a> (${esc(p.year)})</div>
+    <div class="m">${esc(au)} · ${esc(p.venue||"?")} · ${p.citations} citations · [${(p.sources||[]).join("+")}] · id <code>${esc(p.s2_id || (p.doi?"DOI:"+p.doi:(p.arxiv?"ARXIV:"+p.arxiv:"n/a")))}</code></div>
+    ${p.abstract?`<div class="abs">${esc(p.abstract.slice(0,400))}${p.abstract.length>400?"…":""}</div>`:""}</div>`;
+}
+
+function inline(s){
+  s = esc(s);
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
+  s = s.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/(^|\s)(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  return s;
+}
+function md(text){
+  const lines = text.replace(/<!--[\s\S]*?-->/g, "").split("\n"); let out=[], i=0;
+  while (i<lines.length){
+    let l = lines[i];
+    if (/^\s*$/.test(l)) { i++; continue; }
+    let h = l.match(/^(#{1,4})\s+(.*)/); if (h){ out.push(`<h${h[1].length+1}>${inline(h[2])}</h${h[1].length+1}>`); i++; continue; }
+    if (/^---+\s*$/.test(l)) { out.push("<hr>"); i++; continue; }
+    if (/^\|/.test(l)) { let rows=[]; while(i<lines.length && /^\|/.test(lines[i])){ rows.push(lines[i]); i++; }
+      rows = rows.filter(r=>!/^\|\s*-/.test(r)); const cells = r=>r.replace(/^\||\|$/g,"").split("|").map(c=>inline(c.trim()));
+      out.push("<table><tr>"+cells(rows[0]).map(c=>`<th>${c}</th>`).join("")+"</tr>"+rows.slice(1).map(r=>"<tr>"+cells(r).map(c=>`<td>${c}</td>`).join("")+"</tr>").join("")+"</table>"); continue; }
+    if (/^\s*([-*]|\d+\.)\s+/.test(l)) { const ordered=/^\s*\d+\./.test(l); let items=[];
+      while(i<lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])){ let item=lines[i].replace(/^\s*([-*]|\d+\.)\s+/,""); i++;
+        while(i<lines.length && /^\s{2,}\S/.test(lines[i]) && !/^\s*([-*]|\d+\.)\s+/.test(lines[i])){ item+=" "+lines[i].trim(); i++; } items.push(`<li>${inline(item)}</li>`); }
+      out.push(`<${ordered?"ol":"ul"}>${items.join("")}</${ordered?"ol":"ul"}>`); continue; }
+    if (/^>\s?/.test(l)) { let q=[]; while(i<lines.length && /^>\s?/.test(lines[i])){ q.push(lines[i].replace(/^>\s?/,"")); i++; } out.push(`<blockquote>${inline(q.join(" "))}</blockquote>`); continue; }
+    let para=[]; while(i<lines.length && !/^\s*$/.test(lines[i]) && !/^(#{1,4}\s|\||>|\s*[-*]\s|\s*\d+\.\s|---)/.test(lines[i])){ para.push(lines[i]); i++; }
+    if (!para.length){ para.push(lines[i]); i++; }
+    out.push(`<p>${inline(para.join(" "))}</p>`);
+  }
+  return out.join("\n");
+}
+
+function downloads(runId, hasPapers, hasReport){
+  const fmts = hasPapers ? [["bib","BibTeX"],["ris","RIS"],["csv","CSV"],["json","JSON"],["md","Markdown"]] : (hasReport ? [["md","Markdown report"]] : []);
+  return `<div class="dl">${fmts.map(([f,l])=>`<a class="small" href="/api/run/${runId}/export?fmt=${f}" download><button class="small">Download ${l}</button></a>`).join("")}</div>`;
+}
+
+function renderResult(el, run, result, mode){
+  let h = `<div class="muted">${esc(mode)} · run <code>${esc(run.id||run)}</code>${run.time?" · "+esc(run.time):""}</div>`;
+  if (result.papers){
+    h += downloads(run.id||run, true, false);
+    h += result.stats ? `<div class="muted">hits: ${Object.entries(result.stats).map(([k,v])=>`${k} ${v}`).join(", ")}</div>` : "";
+    h += result.papers.map((p,i)=>paperHtml(p,i+1)).join("") || "<p>No results.</p>";
+    if (mode==="search") h += `<p class="muted">Manual check: <a target="_blank" rel="noopener" href="https://scholar.google.com/scholar?q=${encodeURIComponent(run.inputs?run.inputs.text:$("text").value)}">open this query in Google Scholar</a></p>`;
+  } else if (result.report){
+    h += downloads(run.id||run, false, true);
+    h += `<div class="md">${md(result.report)}</div>`;
+    if (result.log && result.log.length){
+      h += `<details><summary class="muted">Search log (${result.log.length} tool calls)</summary><table><tr><th>tool</th><th>input</th><th>hits</th></tr>${result.log.map(e=>`<tr><td>${esc(e.tool)}</td><td>${esc(e.args.query||e.args.paper_id||e.args.arxiv_id||"")}</td><td>${esc(e.error?("error: "+e.error):(e.hits?Object.entries(e.hits).map(([k,v])=>k+" "+v).join(", ")+" → "+e.merged+" merged":(e.chars?e.chars+" chars":e.merged)))}</td></tr>`).join("")}</table></details>`;
+    }
+  } else if (result.oa){
+    const o = result.oa;
+    h += `<div class="md"><p><strong>${esc(o.title)}</strong></p>${o.pdf||o.page?`<p>Open access: yes (${esc(o.version||"?")})<br>PDF: ${o.pdf?`<a href="${esc(o.pdf)}" target="_blank">${esc(o.pdf)}</a>`:"n/a"}<br>Page: ${o.page?`<a href="${esc(o.page)}" target="_blank">${esc(o.page)}</a>`:"n/a"}</p>`:"<p>No legal open-access copy found.</p>"}</div>`;
+  }
+  el.innerHTML = h; el.classList.remove("hidden");
+}
+
+async function run(){
+  const m = mode(), text = $("text").value.trim();
+  if (!text) { $("text").focus(); return; }
+  const body = {mode:m, text, n:$("n").value, year_from:$("year").value, backend:$("backend").value, model:$("model").value, rounds:$("rounds").value, out:$("out").value};
+  $("go").disabled = true; $("status").classList.remove("hidden"); $("result").classList.add("hidden");
+  $("statusLine").textContent = "Running…"; $("progress").textContent = ""; $("progress").classList.toggle("hidden", !AGENT.has(m));
+  let job;
+  try { job = await (await fetch("/api/jobs", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})).json(); }
+  catch(e){ $("statusLine").textContent = "Could not start: "+e; $("go").disabled=false; return; }
+  if (job.error){ $("statusLine").textContent = job.error; $("go").disabled=false; return; }
+  const t0 = Date.now();
+  const poll = async ()=>{
+    const j = await (await fetch("/api/jobs/"+job.job_id)).json();
+    $("progress").textContent = (j.progress||[]).join("\n"); $("progress").scrollTop = 1e9;
+    const secs = Math.round((Date.now()-t0)/1000);
+    if (j.status==="running"){ $("statusLine").textContent = `Running… ${secs}s`; setTimeout(poll, AGENT.has(m)?1500:500); return; }
+    $("go").disabled = false;
+    if (j.status==="error"){ $("statusLine").textContent = "Failed: "+j.error; return; }
+    $("statusLine").textContent = `Done in ${secs}s` + (j.written&&j.written.length ? " · saved " + j.written.join(", ") : "");
+    renderResult($("result"), j.run_id, j.result, m);
+  };
+  poll();
+}
+$("go").addEventListener("click", run);
+$("text").addEventListener("keydown", e=>{ if ((e.metaKey||e.ctrlKey) && e.key==="Enter") run(); });
+
+async function loadHistory(){
+  const rows = await (await fetch("/api/history")).json();
+  $("histBody").innerHTML = rows.map(r=>`<tr data-id="${esc(r.id)}"><td>${esc(r.time)}</td><td>${esc(r.mode)}</td><td>${esc((r.inputs&&r.inputs.text||"").slice(0,90))}</td><td>${r.n_results??(r.has_report?"report":"")}</td><td><button class="small del" data-id="${esc(r.id)}">delete</button></td></tr>`).join("") || `<tr><td colspan="5" class="muted">no runs yet</td></tr>`;
+  document.querySelectorAll("#histBody tr[data-id]").forEach(tr=>tr.addEventListener("click", async e=>{
+    if (e.target.classList.contains("del")) return;
+    const run = await (await fetch("/api/run/"+tr.dataset.id)).json();
+    renderResult($("histResult"), run, {papers:run.papers, report:run.report, log:run.log, stats:run.stats}, run.mode);
+    $("histResult").scrollIntoView({behavior:"smooth"});
+  }));
+  document.querySelectorAll("#histBody .del").forEach(b=>b.addEventListener("click", async e=>{
+    e.stopPropagation(); if (!confirm("Delete this run from history?")) return;
+    await fetch("/api/run/"+b.dataset.id, {method:"DELETE"}); loadHistory(); $("histResult").classList.add("hidden");
+  }));
+}
+function showTab(t){ $("run").classList.toggle("hidden", t!=="run"); $("hist").classList.toggle("hidden", t!=="hist");
+  $("tabRun").classList.toggle("on", t==="run"); $("tabHist").classList.toggle("on", t==="hist"); if (t==="hist") loadHistory(); }
+$("tabRun").addEventListener("click", ()=>showTab("run")); $("tabHist").addEventListener("click", ()=>showTab("hist"));
+loadConfig();
+</script>
+</body>
+</html>

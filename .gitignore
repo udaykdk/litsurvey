@@ -1,0 +1,22 @@
+# local notes
+gitcmds.txt
+prompt.txt
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+
+# editor / OS
+.DS_Store
+._*
+Thumbs.db
+*.swp
+*~
+
+# claude local settings
+.claude/settings.local.json

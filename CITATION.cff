@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+title: "litsurvey: multi-source scientific literature search with LLM-assisted novelty assessment"
+message: >-
+  If you use this software in your research, please cite it using the
+  metadata below.
+type: software
+authors:
+  - family-names: Khankhoje
+    given-names: Uday K
+    email: uday@ee.iitm.ac.in
+    affiliation: >-
+      Department of Electrical Engineering, Indian Institute of Technology
+      Madras
+    orcid: 'https://orcid.org/0000-0002-9629-3922'
+repository-code: 'https://github.com/udaykdk/litsurvey'
+abstract: >-
+  A zero-dependency Python tool that searches OpenAlex, Semantic Scholar and
+  arXiv, fuses and de-duplicates the results, walks the citation graph, finds
+  open-access copies, and exports BibTeX/RIS/CSV. Optionally, a local or
+  cloud LLM drives multi-step novelty assessment and state-of-the-art
+  surveys, with a reproducible search log. Designed so that confidential
+  manuscript content never has to leave the user's machine.
+keywords:
+  - literature search
+  - peer review
+  - systematic review
+  - novelty assessment
+  - Semantic Scholar
+  - OpenAlex
+  - arXiv
+  - BibTeX
+  - large language models
+license: MIT
+version: 1.0.0
+date-released: '2026-09-07'

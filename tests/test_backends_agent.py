@@ -1,0 +1,109 @@
+import json
+
+from litsurvey import agent, backends, http
+
+MSGS = [{"role": "system", "content": "sys"},
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": "", "tool_calls": [
+            {"id": "c1", "name": "search_papers", "args": {"query": "q1"}},
+            {"id": "c2", "name": "get_related", "args": {"paper_id": "p"}}]},
+        {"role": "tool", "tool_call_id": "c1", "name": "search_papers", "content": "[1]"},
+        {"role": "tool", "tool_call_id": "c2", "name": "get_related", "content": "[2]"}]
+
+
+def capture(monkeypatch, reply):
+    seen = {}
+
+    def post(url, payload, headers=None, timeout=900):
+        seen["url"], seen["payload"], seen["headers"] = url, payload, headers
+        return reply
+    monkeypatch.setattr(http, "post_json", post)
+    return seen
+
+
+def test_openai_conversion_and_parse(monkeypatch):
+    seen = capture(monkeypatch, {"choices": [{"message": {"content": None, "tool_calls": [
+        {"id": "x", "function": {"name": "search_papers", "arguments": '{"query": "kan"}'}}]}}]})
+    monkeypatch.setitem(backends.CFG, "openai_api_key", "sk")
+    out = backends.chat("openai", "m", MSGS, tools=agent.TOOLS)
+    p = seen["payload"]
+    assert p["messages"][2]["tool_calls"][0]["function"]["arguments"] == '{"query": "q1"}'
+    assert p["messages"][3] == {"role": "tool", "tool_call_id": "c1", "content": "[1]"}
+    assert p["tools"][0]["type"] == "function"
+    assert seen["headers"]["Authorization"] == "Bearer sk"
+    assert out["tool_calls"] == [{"id": "x", "name": "search_papers", "args": {"query": "kan"}}]
+    assert out["content"] == ""
+
+
+def test_anthropic_groups_tool_results(monkeypatch):
+    seen = capture(monkeypatch, {"content": [{"type": "text", "text": "report"},
+                                             {"type": "tool_use", "id": "t1", "name": "read_paper",
+                                              "input": {"arxiv_id": "1"}}]})
+    monkeypatch.setitem(backends.CFG, "anthropic_api_key", "ak")
+    out = backends.chat("anthropic", "m", MSGS, tools=agent.TOOLS)
+    p = seen["payload"]
+    assert p["system"] == "sys" and p["messages"][0]["role"] == "user"
+    assert p["messages"][1]["content"][0]["type"] == "tool_use"
+    results = p["messages"][2]["content"]
+    assert p["messages"][2]["role"] == "user" and len(results) == 2
+    assert results[1] == {"type": "tool_result", "tool_use_id": "c2", "content": "[2]"}
+    assert p["tools"][0]["input_schema"]["type"] == "object"
+    assert out == {"content": "report", "tool_calls": [{"id": "t1", "name": "read_paper",
+                                                        "args": {"arxiv_id": "1"}}]}
+
+
+def test_ollama_conversion(monkeypatch):
+    seen = capture(monkeypatch, {"message": {"content": "", "tool_calls": [
+        {"function": {"name": "get_citations", "arguments": {"paper_id": "z"}}}]}})
+    out = backends.chat("ollama", "m", MSGS, tools=agent.TOOLS)
+    p = seen["payload"]
+    assert p["messages"][3] == {"role": "tool", "tool_name": "search_papers", "content": "[1]"}
+    assert out["tool_calls"][0]["name"] == "get_citations" and out["tool_calls"][0]["args"] == {"paper_id": "z"}
+
+
+def test_agent_loop_runs_tools_and_stops(monkeypatch):
+    replies = iter([
+        {"content": "", "tool_calls": [{"id": "a", "name": "search_papers", "args": {"query": "kan pinn"}},
+                                       {"id": "b", "name": "read_paper", "args": {"arxiv_id": "9"}}]},
+        {"content": "## Verdict\nfine", "tool_calls": []},
+    ])
+    monkeypatch.setattr(backends, "resolve", lambda b, m: ("ollama", "test-model"))
+    monkeypatch.setattr(backends, "chat", lambda *a, **k: next(replies))
+    monkeypatch.setattr(agent, "run_search", lambda q, **k: ([], {"openalex": 0, "s2": 0, "arxiv": 0}))
+    monkeypatch.setattr(agent.arxiv, "full_text", lambda aid: (_ for _ in ()).throw(RuntimeError("no html")))
+    lines = []
+    res = agent.run("novelty", "claim", rounds=5, progress=lines.append)
+    assert res["report"].startswith("## Verdict") and res["rounds_used"] == 2
+    assert res["log"][0]["tool"] == "search_papers" and res["log"][0]["merged"] == 0
+    assert res["log"][1]["error"] == "no html"
+    assert any("search_papers" in ln for ln in lines)
+    md = agent.search_log_markdown(res["log"], "ollama", "test-model")
+    assert "| 1 |" in md and "kan pinn" in md and "error: no html" in md
+
+
+def test_agent_round_limit_forces_report(monkeypatch):
+    calls = {"n": 0}
+
+    def chat(backend, model, messages, tools=None):
+        calls["n"] += 1
+        if tools:
+            return {"content": "", "tool_calls": [{"id": "a", "name": "search_papers", "args": {"query": "x"}}]}
+        assert messages[-1]["role"] == "user" and "Stop searching" in messages[-1]["content"]
+        return {"content": "forced report", "tool_calls": []}
+    monkeypatch.setattr(backends, "resolve", lambda b, m: ("ollama", "m"))
+    monkeypatch.setattr(backends, "chat", chat)
+    monkeypatch.setattr(agent, "run_search", lambda q, **k: ([], {}))
+    res = agent.run("research", "q", rounds=2, progress=lambda s: None)
+    assert res["report"] == "forced report" and calls["n"] == 3 and len(res["log"]) == 2
+
+
+def test_resolve_errors_without_backend(monkeypatch):
+    monkeypatch.setattr(backends, "ollama_models", lambda host=None: (_ for _ in ()).throw(ConnectionError()))
+    for k in ("backend", "openai_api_key", "anthropic_api_key"):
+        monkeypatch.setitem(backends.CFG, k, "")
+    monkeypatch.setitem(backends.CFG, "openai_base_url", "https://api.openai.com")
+    try:
+        backends.resolve()
+        assert False
+    except RuntimeError as e:
+        assert "no LLM backend" in str(e)
