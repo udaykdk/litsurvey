@@ -62,9 +62,13 @@ or `custom`. The commands used are:
 
 Things to know:
 
-- Sign in first by running the tool once interactively. If it is signed
-  out, litsurvey reports the tool's error (for Claude Code, "OAuth session
-  expired").
+- Sign in first, and check it the way the non-interactive mode sees it.
+  For Claude Code run `claude auth status`; it must say `"loggedIn": true`.
+  If it says false, run `claude auth login` (or `/login` inside `claude`).
+  An interactive `claude` that opens without complaint does not prove print
+  mode is signed in: the interactive session can borrow a token from the
+  Claude desktop app, print mode cannot. When signed out, litsurvey reports
+  the tool's own error ("OAuth session expired and could not be refreshed").
 - Your claim or question and everything the agent reads go to that vendor
   under your subscription's terms. This is not the option for confidential
   manuscripts; use option 2.
@@ -75,8 +79,10 @@ Things to know:
   configurations, which stops litsurvey's API calls. If runs fail with
   network errors, allow network in your Codex config, or use the `custom`
   tool with the flags your version needs.
-- Only the Claude Code command has been tested by the author; the Codex and
-  Gemini commands follow their documented flags. Reports welcome.
+- The Claude Code path has been run end to end by the author (a real
+  novelty assessment with a full search log). The Codex and Gemini commands
+  follow those tools' documented flags but have not been run; reports
+  welcome.
 - `--rounds` becomes a command budget for the agent (about three commands
   per round).
 
