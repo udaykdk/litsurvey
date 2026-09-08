@@ -73,11 +73,14 @@ $ litsurvey cites "superior thermal conductivity graphene" --pick 1
 1. **Two-Dimensional Phonon Transport in Supported Graphene** …
 ```
 
-`cites` and `refs` walk the citation graph. `related` uses a recommendation
-model on Semantic Scholar's servers, which finds papers on the same topic
-that use different words. All four use Semantic Scholar only; a paper that
-has no Semantic Scholar record gives an error, in which case try the DOI
-form of the ID.
+`cites` and `refs` walk the citation graph, most-cited first (`--sort year`
+for newest first). For a paper with a DOI they use OpenAlex, which ranks
+citing works server-side, so a paper with thousands of citations shows its
+most influential citers rather than the newest few. Papers without a DOI
+fall back to Semantic Scholar, whose citation lists come newest first.
+`related` uses a recommendation model on Semantic Scholar's servers, which
+finds papers on the same topic that use different words. A paper with no
+Semantic Scholar record gives an error; try the DOI form of the id.
 
 ## oa
 

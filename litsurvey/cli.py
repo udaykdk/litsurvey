@@ -33,6 +33,8 @@ def _print_papers(args, plist):
     plist = ops.sort_papers(plist, getattr(args, "sort", "relevance"))
     if args.json:
         print(export.to_json(plist), end="")
+    elif not plist:
+        print("no results")
     else:
         print(ops.papers_text(plist, snippet=350 if args.abstracts else 0))
 
@@ -65,6 +67,7 @@ def cmd_list_mode(mode):
             params["sources"] = args.sources.split(",") if args.sources else None
         else:
             params["pick"] = getattr(args, "pick", None)
+            params["sort"] = getattr(args, "sort", "relevance")
         result = ops.run_mode(mode, params)
         if result.get("needs_choice"):
             params["text"] = _choose(result, args)

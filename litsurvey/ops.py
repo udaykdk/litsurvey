@@ -4,7 +4,7 @@ import os
 import time
 
 from . import agent, export, history, papers
-from .sources import run_search, semanticscholar, unpaywall
+from .sources import openalex, run_search, semanticscholar, unpaywall
 
 LIST_MODES = ("search", "paper", "cites", "refs", "related")
 ID_MODES = ("paper", "cites", "refs", "related", "oa")
@@ -67,10 +67,7 @@ def run_mode(mode, params, progress=None):
     if mode == "paper":
         return {"papers": [semanticscholar.paper(text)]}
     if mode in ("cites", "refs"):
-        # one request either way: fetch a larger page so "most cited first" is
-        # chosen from a real sample, not from the API's first few rows
-        direction = "citations" if mode == "cites" else "references"
-        return {"papers": semanticscholar.linked(text, direction, limit=max(n, 100))[:n]}
+        return {"papers": linked_papers(mode, text, n, params.get("sort") or "citations", progress)}
     if mode == "related":
         return {"papers": semanticscholar.related(text, limit=n)}
     if mode == "oa":
@@ -80,6 +77,39 @@ def run_mode(mode, params, progress=None):
                          model=params.get("model"), rounds=int(params.get("rounds") or 8),
                          progress=progress)
     raise ValueError(f"unknown mode {mode!r}")
+
+
+def linked_papers(mode, pid, n, sort, progress=None):
+    """Citing papers / references, ranked by citation count (or year).
+
+    OpenAlex can sort these server-side, so it is used whenever the paper has a
+    DOI. Semantic Scholar cannot sort its citation lists (they come newest
+    first), so it is the fallback for papers without a DOI."""
+    say = progress or (lambda s: print(s, file=__import__("sys").stderr))
+    doi = pid[4:] if pid.upper().startswith("DOI:") else ""
+    if not doi:
+        try:
+            doi = semanticscholar.paper(pid)["doi"]
+        except Exception:  # noqa: BLE001
+            doi = ""
+    if doi:
+        try:
+            work = openalex.work_by_doi(doi)
+            if mode == "cites":
+                out = openalex.citing(work["id"], limit=n, sort=sort)
+            else:
+                out = openalex.references(work, limit=n, sort=sort)
+            if out:
+                return out
+            say("[note] OpenAlex has no " + ("citations" if mode == "cites" else "reference list")
+                + " for this paper (common for preprints); trying Semantic Scholar")
+        except Exception as e:  # noqa: BLE001
+            say(f"[warn] OpenAlex lookup failed ({e}); falling back to Semantic Scholar (newest first)")
+    else:
+        say("[note] paper has no DOI; using Semantic Scholar, whose citation lists come newest first")
+    direction = "citations" if mode == "cites" else "references"
+    plist = semanticscholar.linked(pid, direction, limit=max(n, 100))
+    return sort_papers(plist, sort)[:n]
 
 
 def report_text(mode, text, result, with_log=True):

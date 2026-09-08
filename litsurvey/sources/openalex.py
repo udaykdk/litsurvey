@@ -51,3 +51,40 @@ def search(query, limit=20, year_from=None):
         params["filter"] = f"from_publication_date:{year_from}-01-01"
     data = http.get_json(f"{BASE}/works?" + urllib.parse.urlencode(params))
     return [_map(w) for w in data.get("results", [])]
+
+
+def _params(extra):
+    params = dict(extra)
+    if CFG["openalex_mailto"]:
+        params["mailto"] = CFG["openalex_mailto"]
+    return urllib.parse.urlencode(params)
+
+
+def work_by_doi(doi):
+    """The OpenAlex work record for a DOI (its 'id' is the W... identifier)."""
+    doi = doi.replace("DOI:", "").replace("https://doi.org/", "").strip()
+    return http.get_json(f"{BASE}/works/doi:{urllib.parse.quote(doi, safe='/')}?" + _params({}))
+
+
+_SORT = {"citations": "cited_by_count:desc", "year": "publication_date:desc", "relevance": "cited_by_count:desc"}
+
+
+def citing(work_id, limit=20, sort="citations"):
+    """Works that cite the given work, sorted server-side."""
+    wid = work_id.rsplit("/", 1)[-1]
+    data = http.get_json(f"{BASE}/works?" + _params({"filter": f"cites:{wid}", "sort": _SORT.get(sort, _SORT["citations"]),
+                                                    "per-page": str(min(limit, 100))}))
+    return [_map(w) for w in data.get("results", [])]
+
+
+def references(work, limit=20, sort="citations"):
+    """Works the given work record cites (its referenced_works), sorted."""
+    ids = [r.rsplit("/", 1)[-1] for r in (work.get("referenced_works") or [])]
+    out = []
+    for i in range(0, min(len(ids), 200), 50):
+        chunk = "|".join(ids[i:i + 50])
+        data = http.get_json(f"{BASE}/works?" + _params({"filter": f"openalex:{chunk}", "per-page": "50"}))
+        out.extend(_map(w) for w in data.get("results", []))
+    key = (lambda p: p["year"] or 0) if sort == "year" else (lambda p: p["citations"])
+    out.sort(key=key, reverse=True)
+    return out[:limit]

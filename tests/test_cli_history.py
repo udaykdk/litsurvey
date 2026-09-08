@@ -111,3 +111,24 @@ def test_cli_non_tty_prints_candidates_and_exits_2(monkeypatch, capsys):
     assert e.value.code == 2
     err = capsys.readouterr().err
     assert "not a paper id" in err and "--pick N" in err and "id: DOI:10/b" in err
+
+
+def test_linked_papers_prefers_openalex_and_falls_back(monkeypatch):
+    monkeypatch.setattr(ops.openalex, "work_by_doi", lambda doi: {"id": "W9", "referenced_works": []})
+    monkeypatch.setattr(ops.openalex, "citing", lambda wid, limit, sort: [P.make(title="via openalex", sources=["openalex"])])
+    assert ops.linked_papers("cites", "DOI:10.1234/x", 5, "citations", lambda s: None)[0]["title"] == "via openalex"
+    # no DOI -> Semantic Scholar
+    monkeypatch.setattr(ops.semanticscholar, "paper", lambda pid: P.make(title="t", doi=""))
+    monkeypatch.setattr(ops.semanticscholar, "linked", lambda pid, d, limit=20: [P.make(title="via s2", year=2020, citations=1), P.make(title="newer", year=2024, citations=0)])
+    out = ops.linked_papers("cites", "abc", 5, "citations", lambda s: None)
+    assert [p["title"] for p in out] == ["via s2", "newer"]
+    assert ops.linked_papers("cites", "abc", 5, "year", lambda s: None)[0]["title"] == "newer"
+
+
+def test_linked_papers_falls_back_when_openalex_is_empty(monkeypatch):
+    monkeypatch.setattr(ops.openalex, "work_by_doi", lambda doi: {"id": "W9", "referenced_works": []})
+    monkeypatch.setattr(ops.openalex, "references", lambda work, limit, sort: [])
+    monkeypatch.setattr(ops.semanticscholar, "linked", lambda pid, d, limit=20: [P.make(title="from s2 refs")])
+    notes = []
+    out = ops.linked_papers("refs", "DOI:10.1234/x", 5, "citations", notes.append)
+    assert out[0]["title"] == "from s2 refs" and any("trying Semantic Scholar" in n for n in notes)

@@ -100,3 +100,24 @@ def test_run_search_merges_and_survives_a_failing_source(monkeypatch):
     plist, stats = run_search("deep thing")
     assert len(plist) == 1 and plist[0]["sources"] == ["openalex", "s2"]
     assert stats["openalex"] == 1 and stats["s2"] == 1 and stats["arxiv"].startswith("error")
+
+
+def test_openalex_citing_and_references(monkeypatch):
+    calls = []
+
+    def get_json(url, **k):
+        calls.append(url)
+        if "/works/doi:" in url:
+            return {"id": "https://openalex.org/W1", "referenced_works": ["https://openalex.org/W2", "https://openalex.org/W3"]}
+        if "cites%3AW1" in url:
+            assert "sort=cited_by_count%3Adesc" in url
+            return OA
+        if "openalex%3AW2%7CW3" in url:
+            return {"results": [dict(OA["results"][0], cited_by_count=5), dict(OA["results"][0], cited_by_count=50, title="Big")]}
+        raise AssertionError(url)
+    monkeypatch.setattr(http, "get_json", get_json)
+    w = openalex.work_by_doi("DOI:10.5/deep")
+    assert w["id"].endswith("W1")
+    assert openalex.citing(w["id"], limit=5)[0]["title"] == "Deep Thing"
+    refs = openalex.references(w, limit=5)
+    assert [p["title"] for p in refs] == ["Big", "Deep Thing"]     # most cited first
