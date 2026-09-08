@@ -28,13 +28,15 @@ def key(p):
 
 
 def best_id(p):
-    """The identifier to pass to paper/cites/refs/related."""
-    if p.get("s2_id"):
-        return p["s2_id"]
+    """The identifier to pass to paper/cites/refs/related. A DOI is preferred
+    because both Semantic Scholar and OpenAlex accept it (so fallbacks work);
+    then an arXiv id, then the Semantic Scholar hash."""
     if p.get("doi"):
         return "DOI:" + p["doi"]
     if p.get("arxiv"):
         return "ARXIV:" + p["arxiv"]
+    if p.get("s2_id"):
+        return p["s2_id"]
     return ""
 
 

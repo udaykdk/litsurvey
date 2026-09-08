@@ -35,9 +35,9 @@ def test_rrf_prefers_papers_ranked_high_in_more_sources():
 
 
 def test_best_id_priority():
-    assert P.best_id(mk(s2_id="h", doi="10/x", arxiv="1")) == "h"
-    assert P.best_id(mk(doi="10/x", arxiv="1")) == "DOI:10/x"
-    assert P.best_id(mk(arxiv="1")) == "ARXIV:1"
+    assert P.best_id(mk(s2_id="h", doi="10/x", arxiv="1")) == "DOI:10/x"
+    assert P.best_id(mk(s2_id="h", arxiv="1")) == "ARXIV:1"
+    assert P.best_id(mk(s2_id="h")) == "h"
     assert P.best_id(mk()) == ""
 
 
@@ -47,7 +47,7 @@ def test_format_and_compact():
     txt = P.format_paper(p, 1, snippet=10)
     assert "et al." in txt and "id: `id1`" in txt
     c = P.compact([p])[0]
-    assert len(c["abstract"]) == 350 and c["id"] == "id1"
+    assert len(c["abstract"]) == 350 and c["id"] == "id1"   # no DOI/arXiv, so the hash
 
 
 def test_scholar_url():
