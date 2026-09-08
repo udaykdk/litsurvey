@@ -91,6 +91,11 @@ to arXiv for use of its open access interoperability) and
 [Unpaywall](https://unpaywall.org). If you publish work that used these
 results, please credit them.
 
+## Credits
+
+The banner of the web page uses slivers of an aerial beach photograph by
+[Lance Asper on Unsplash](https://unsplash.com/@lance_asper).
+
 ## Citing
 
 See [CITATION.cff](CITATION.cff). GitHub shows a "Cite this repository"

@@ -20,3 +20,6 @@ Thumbs.db
 
 # claude local settings
 .claude/settings.local.json
+
+# source photo for the web banner (Lance Asper, Unsplash); slivers are embedded in index.html
+lance-asper-*.jpg
