@@ -23,7 +23,13 @@
   nav button.on { background:#fff; color:var(--accent); }
   header .links { margin-left:auto; display:flex; gap:8px; } header .links a { color:#fff; background:rgba(10,40,70,.45); border:1px solid rgba(255,255,255,.35); border-radius:6px; padding:5px 10px; font-size:13px; text-decoration:none; text-shadow:none; }
   header .links a:hover { background:rgba(0,0,0,.35); }
-  .llmloc { display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border:1px dashed var(--line); border-radius:6px; }
+  .module { border-radius:8px; padding:12px 14px 10px; margin-bottom:10px; border:1px solid transparent; }
+  .module.search { background:#fbf4e3; border-color:#ead9b2; }
+  .module.agent { background:#e8f1fa; border-color:#c3d9ee; display:grid; grid-template-columns:minmax(260px,1fr) minmax(300px,1.3fr); gap:6px 22px; align-items:start; }
+  .module .grp { margin-top:0; } .module.agent .grp { grid-column:1 / -1; }
+  .module.agent .modes { grid-template-columns:1fr; }
+  .llmloc { display:flex; gap:18px; flex-wrap:wrap; padding:10px 12px; border:1px solid #c3d9ee; border-radius:6px; background:rgba(255,255,255,.7); transition:opacity .15s; }
+  .llmloc.off { opacity:.4; pointer-events:none; }
   .llmloc label { display:flex; gap:8px; align-items:flex-start; cursor:pointer; } .llmloc small { display:block; color:var(--muted); }
   .llmloc .grp2 { flex-basis:100%; font-size:13px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
   main { max-width:1100px; margin:0 auto; padding:18px 22px 60px; }
@@ -32,7 +38,7 @@
   .modes { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:6px 14px; }
   .modes label { display:flex; gap:8px; align-items:flex-start; cursor:pointer; }
   .modes small { display:block; color:var(--muted); }
-  .grp { font-weight:600; margin:10px 0 4px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .grp { font-weight:600; margin:10px 0 6px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:#4a4a45; }
   textarea, input[type=text], input[type=number], select { font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--fg); }
   textarea { width:100%; box-sizing:border-box; min-height:64px; }
   .row { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:flex-end; margin-top:10px; }
@@ -69,6 +75,7 @@
 <section id="run">
   <div class="card">
     <form id="form" onsubmit="return false;">
+      <div class="module search">
       <div class="grp">Search &amp; lookup (no LLM involved)</div>
       <div class="modes">
         <label><input type="radio" name="mode" value="search" checked><span>Search<small>keyword search across OpenAlex, Semantic Scholar, arXiv</small></span></label>
@@ -78,15 +85,18 @@
         <label><input type="radio" name="mode" value="related"><span>Related<small>similar papers (recommendation engine)</small></span></label>
         <label><input type="radio" name="mode" value="oa"><span>Open access<small>legal free copy of a DOI (Unpaywall)</small></span></label>
       </div>
+      </div>
+      <div class="module agent">
       <div class="grp">LLM agent (needs a backend)</div>
       <div class="modes">
         <label><input type="radio" name="mode" value="novelty"><span>Novelty<small>prior-art verdict for a claim</small></span></label>
         <label><input type="radio" name="mode" value="research"><span>Research<small>cited state-of-the-art survey for a question</small></span></label>
       </div>
-      <div id="llmloc" class="llmloc hidden">
+      <div id="llmloc" class="llmloc off">
         <span class="grp2">Where does the LLM run?</span>
-        <label><input type="radio" name="llmloc" value="local" checked><span>Local<small>Ollama on this machine; your text never leaves it</small></span></label>
-        <label><input type="radio" name="llmloc" value="cloud"><span>Cloud<small>OpenAI-compatible or Anthropic API; your text is sent to the provider</small></span></label>
+        <label><input type="radio" name="llmloc" value="local" checked disabled><span>Local<small>Ollama on this machine; your text never leaves it</small></span></label>
+        <label><input type="radio" name="llmloc" value="cloud" disabled><span>Cloud<small>OpenAI-compatible or Anthropic API; your text is sent to the provider</small></span></label>
+      </div>
       </div>
       <div class="row" style="margin-top:14px"><label style="flex:1"><span id="inLabel">Keyword query</span><textarea id="text" placeholder="e.g. physics informed neural networks inverse problems"></textarea></label></div>
       <div id="urlNote" class="note warn hidden"></div>
@@ -135,7 +145,8 @@ function refreshForm(){
   const isAgent = AGENT.has(m);
   $("optN").classList.toggle("hidden", isAgent || m==="oa" || m==="paper");
   $("optYear").classList.toggle("hidden", m!=="search");
-  $("llmloc").classList.toggle("hidden", !isAgent);
+  $("llmloc").classList.toggle("off", !isAgent);
+  document.querySelectorAll('input[name=llmloc]').forEach(r=>{ r.disabled = !isAgent; });
   $("optBackend").classList.toggle("hidden", !isAgent || llmLocal());
   for (const id of ["optModel","optRounds"]) $(id).classList.toggle("hidden", !isAgent);
   if (!$("rounds").dataset.touched) $("rounds").value = m==="research" ? 12 : 8;
