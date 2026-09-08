@@ -135,7 +135,7 @@ class Handler(BaseHTTPRequestHandler):
             mode = body.get("mode")
             if mode not in ops.MODES:
                 return self._json({"error": f"unknown mode {mode!r}"}, 400)
-            params = {k: body.get(k) for k in ("text", "n", "year_from", "backend", "model", "rounds")}
+            params = {k: body.get(k) for k in ("text", "n", "year_from", "backend", "model", "rounds", "pick")}
             params = {k: v for k, v in params.items() if v not in (None, "", [])}
             if "n" in params:
                 params["n"] = int(params["n"])

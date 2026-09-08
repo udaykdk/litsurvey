@@ -46,6 +46,7 @@
   button.primary { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:9px 18px; font:inherit; cursor:pointer; }
   button.primary:disabled { opacity:.5; cursor:default; }
   button.small { font:13px inherit; padding:5px 10px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
+  button.small.on { background:var(--accent); color:#fff; border-color:var(--accent); } button.small:disabled { opacity:.5; cursor:default; }
   .note { padding:8px 12px; border-radius:6px; font-size:14px; margin-top:12px; }
   .note.ok { background:#e8f5ec; color:var(--ok); } .note.warn { background:#fff1e3; color:var(--warn); } .note.info { background:#e9f1fb; color:var(--accent); }
   pre.progress { background:#1f2328; color:#d6dde6; padding:10px 12px; border-radius:6px; font-size:13px; max-height:220px; overflow:auto; white-space:pre-wrap; }
@@ -130,9 +131,9 @@
 </main>
 <script>
 const $ = id => document.getElementById(id);
-const LABELS = {search:"Keyword query", paper:"Paper ID (Semantic Scholar hash, DOI:10.…, or ARXIV:2404.19756)",
-  cites:"Paper ID to find citing papers for", refs:"Paper ID to list references of", related:"Paper ID to find similar papers for",
-  oa:"DOI", novelty:"Claim, phrased as a generic topic (never a sentence from the manuscript)", research:"Research question"};
+const LABELS = {search:"Keyword query", paper:"Paper title, or an id (Semantic Scholar hash, DOI:10.…, ARXIV:2404.19756)",
+  cites:"Title or id of the paper to find citing papers for", refs:"Title or id of the paper to list references of", related:"Title or id of the paper to find similar papers for",
+  oa:"DOI, or the paper's title", novelty:"Claim, phrased as a generic topic (never a sentence from the manuscript)", research:"Research question"};
 const AGENT = new Set(["novelty","research"]);
 let CONFIG = {};
 
@@ -251,12 +252,29 @@ function downloads(runId, hasPapers, hasReport){
   return `<div class="dl">${fmts.map(([f,l])=>`<a class="small" href="/api/run/${runId}/export?fmt=${f}" download><button class="small">Download ${l}</button></a>`).join("")}</div>`;
 }
 
+let CAND = null, CAND_SORT = "relevance", RES_SORT = "relevance";
+function renderCandidates(el, result, mode){
+  CAND = result.candidates; const q = result.query;
+  const sorted = CAND_SORT==="citations" ? [...CAND].sort((a,b)=>b.citations-a.citations) : (CAND_SORT==="year" ? [...CAND].sort((a,b)=>(b.year||0)-(a.year||0)) : CAND);
+  const idOf = p => p.s2_id || (p.doi ? "DOI:"+p.doi : (p.arxiv ? "ARXIV:"+p.arxiv : ""));
+  let h = `<div class="note info">"${esc(q)}" is not a paper id, so I searched for it. Pick the paper you mean and the ${esc(mode)} lookup will run on it.</div>
+    <div class="dl">sort by ${["relevance","citations","year"].map(k=>`<button class="small sortc${k===CAND_SORT?" on":""}" data-k="${k}">${k}</button>`).join("")}</div>`;
+  h += sorted.map((p,i)=>`<div class="paper"><div class="t">${i+1}. <a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a> (${esc(p.year)})</div>
+      <div class="m">${esc((p.authors||[]).slice(0,3).join(", "))}${(p.authors||[]).length>3?" et al.":""} · ${esc(p.venue||"?")} · ${p.citations} citations${mode==="oa"&&!p.doi?" · <em>no DOI, cannot look up open access</em>":""}</div>
+      <div style="margin-top:4px"><button class="small usec" data-id="${esc(idOf(p))}" ${mode==="oa"&&!p.doi?"disabled":""}>Use this paper</button></div></div>`).join("");
+  el.innerHTML = h; el.classList.remove("hidden");
+  el.querySelectorAll(".sortc").forEach(b=>b.addEventListener("click", ()=>{ CAND_SORT = b.dataset.k; renderCandidates(el, result, mode); }));
+  el.querySelectorAll(".usec").forEach(b=>b.addEventListener("click", ()=>{ $("text").value = b.dataset.id; checkUrl(); run(); }));
+}
 function renderResult(el, run, result, mode){
+  if (result && result.needs_choice) return renderCandidates(el, result, mode);
   let h = `<div class="muted">${esc(mode)} · run <code>${esc(run.id||run)}</code>${run.time?" · "+esc(run.time):""}</div>`;
   if (result.papers){
     h += downloads(run.id||run, true, false);
+    h += `<div class="dl">sort by ${["relevance","citations","year"].map(k=>`<button class="small sortr${k===RES_SORT?" on":""}" data-k="${k}">${k}</button>`).join("")}</div>`;
     h += result.stats ? `<div class="muted">hits: ${Object.entries(result.stats).map(([k,v])=>`${k} ${v}`).join(", ")}</div>` : "";
-    h += result.papers.map((p,i)=>paperHtml(p,i+1)).join("") || "<p>No results.</p>";
+    const sorted = RES_SORT==="citations" ? [...result.papers].sort((a,b)=>b.citations-a.citations) : (RES_SORT==="year" ? [...result.papers].sort((a,b)=>(b.year||0)-(a.year||0)) : result.papers);
+    h += sorted.map((p,i)=>paperHtml(p,i+1)).join("") || "<p>No results.</p>";
     if (mode==="search") h += `<p class="muted">Manual check: <a target="_blank" rel="noopener" href="https://scholar.google.com/scholar?q=${encodeURIComponent(run.inputs?run.inputs.text:$("text").value)}">open this query in Google Scholar</a></p>`;
   } else if (result.report){
     h += downloads(run.id||run, false, true);
@@ -269,6 +287,7 @@ function renderResult(el, run, result, mode){
     h += `<div class="md"><p><strong>${esc(o.title)}</strong></p>${o.pdf||o.page?`<p>Open access: yes (${esc(o.version||"?")})<br>PDF: ${o.pdf?`<a href="${esc(o.pdf)}" target="_blank">${esc(o.pdf)}</a>`:"n/a"}<br>Page: ${o.page?`<a href="${esc(o.page)}" target="_blank">${esc(o.page)}</a>`:"n/a"}</p>`:"<p>No legal open-access copy found.</p>"}</div>`;
   }
   el.innerHTML = h; el.classList.remove("hidden");
+  el.querySelectorAll(".sortr").forEach(b=>b.addEventListener("click", ()=>{ RES_SORT = b.dataset.k; renderResult(el, run, result, mode); }));
 }
 
 async function run(){
@@ -289,6 +308,7 @@ async function run(){
     if (j.status==="running"){ $("statusLine").textContent = `Running… ${secs}s`; setTimeout(poll, AGENT.has(m)?1500:500); return; }
     $("go").disabled = false;
     if (j.status==="error"){ $("statusLine").textContent = "Failed: "+j.error; return; }
+    if (j.result && j.result.needs_choice) { $("statusLine").textContent = `Found ${j.result.candidates.length} candidates in ${secs}s`; renderCandidates($("result"), j.result, m); return; }
     $("statusLine").textContent = `Done in ${secs}s` + (j.written&&j.written.length ? " · saved " + j.written.join(", ") : "");
     renderResult($("result"), j.run_id, j.result, m);
   };

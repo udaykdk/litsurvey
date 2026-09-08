@@ -13,7 +13,7 @@ API keys and never print that file.
 
 ```bash
 litsurvey search "keyword query" -n 15 [--year-from 2022] [--abstracts] [--json] [--out refs.bib]
-litsurvey paper   <id>          # id: S2 hash, DOI:10..., or ARXIV:2404.19756
+litsurvey paper   <id|title>    # id: S2 hash, DOI:10..., or ARXIV:2404.19756; a title gives a numbered candidate list (exit 2): rerun with --pick N
 litsurvey cites   <id> [-n 20]  # forward snowball: who cites it
 litsurvey refs    <id> [-n 20]  # backward snowball: what it cites
 litsurvey related <id> [-n 20]  # similar papers via recommender (different vocabulary)

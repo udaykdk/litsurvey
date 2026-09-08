@@ -7,8 +7,35 @@ from . import agent, export, history, papers
 from .sources import run_search, semanticscholar, unpaywall
 
 LIST_MODES = ("search", "paper", "cites", "refs", "related")
+ID_MODES = ("paper", "cites", "refs", "related", "oa")
 AGENT_MODES = ("novelty", "research")
 MODES = LIST_MODES + ("oa",) + AGENT_MODES
+CANDIDATES = 8
+
+
+def resolve_title(text, params, progress=None):
+    """A title or author query instead of an id: search, auto-pick an exact title
+    match or the --pick'd candidate, else return None with params["_candidates"] set."""
+    say = progress or (lambda s: print(s, file=__import__("sys").stderr))
+    plist, _ = run_search(text, limit=CANDIDATES)
+    plist = [p for p in plist if papers.best_id(p)][:CANDIDATES]
+    if not plist:
+        raise ValueError(f"no paper found for {text!r}; try fewer words, or give a DOI")
+    pick = params.get("pick")
+    if pick:
+        i = int(pick)
+        if not 1 <= i <= len(plist):
+            raise ValueError(f"--pick must be between 1 and {len(plist)}")
+        chosen = plist[i - 1]
+    elif papers.norm_title(plist[0]["title"]) == papers.norm_title(text):
+        chosen = plist[0]
+    else:
+        params["_candidates"] = plist
+        return None
+    say(f"[note] using: {chosen['title']} ({chosen['year']}) id {papers.best_id(chosen)}")
+    params["resolved_id"] = papers.best_id(chosen)
+    params["resolved_title"] = chosen["title"]
+    return papers.best_id(chosen)
 
 
 def run_mode(mode, params, progress=None):
@@ -22,6 +49,17 @@ def run_mode(mode, params, progress=None):
         params["text"] = text
         (progress or (lambda s: print(s, file=__import__("sys").stderr)))("[note] " + note)
     n = int(params.get("n") or 15)
+    if mode in ID_MODES and not papers.is_paper_id(text):
+        chosen = resolve_title(text, params, progress)
+        if chosen is None:
+            return {"candidates": params["_candidates"], "query": text, "needs_choice": True}
+        text = chosen
+    if mode in ID_MODES:
+        text = papers.canonical_id(text)
+        if mode == "oa" and not text.upper().startswith("DOI:"):
+            raise ValueError("open-access lookup needs a DOI; this paper has none")
+        if mode == "oa":
+            text = text[4:]
     if mode == "search":
         plist, stats = run_search(text, limit=n, year_from=params.get("year_from"),
                                   sources=params.get("sources"))
@@ -77,6 +115,8 @@ def save(mode, params, result, out=None, with_log=True):
             with open(out, "w", encoding="utf-8") as f:
                 json.dump(result["oa"], f, indent=2)
             written.append(out)
+    if result.get("needs_choice"):
+        return None, written
     run_id = history.record(mode, params, papers=result.get("papers"),
                             report=result.get("report"), log=result.get("log"),
                             stats=result.get("stats"), out_file=written[0] if written else "")
@@ -88,6 +128,25 @@ def oa_text(info):
         return (f"**{info['title']}**\nopen access: yes ({info.get('version') or '?'})\n"
                 f"pdf : {info['pdf'] or 'n/a'}\npage: {info['page'] or 'n/a'}")
     return f"**{info['title']}**\nno legal open-access copy found (is_oa={info['is_oa']})"
+
+
+def candidates_text(result, sort="relevance"):
+    plist = sort_papers(result["candidates"], sort)
+    head = (f"'{result['query']}' is not a paper id. Closest papers (sorted by {sort}); "
+            f"rerun with the id, or add --pick N:\n")
+    return head + "\n".join(
+        f"{i}. {p['title']} ({p['year']}) — {', '.join(p['authors'][:2])}"
+        f"{' et al.' if len(p['authors']) > 2 else ''} · {p['venue'] or '?'} · "
+        f"{p['citations']} citations · id: {papers.best_id(p)}"
+        for i, p in enumerate(plist, 1))
+
+
+def sort_papers(plist, sort="relevance"):
+    if sort == "citations":
+        return sorted(plist, key=lambda p: p["citations"], reverse=True)
+    if sort == "year":
+        return sorted(plist, key=lambda p: p["year"] or 0, reverse=True)
+    return list(plist)
 
 
 def papers_text(plist, snippet=0):

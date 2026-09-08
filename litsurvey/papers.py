@@ -79,6 +79,27 @@ def compact(papers, n=8, abstract_chars=350):
              "abstract": (p["abstract"] or "")[:abstract_chars]} for p in papers[:n]]
 
 
+_ID_RES = (re.compile(r"^[0-9a-f]{40}$", re.I),                  # Semantic Scholar hash
+           re.compile(r"^(DOI:)?10\.\d{4,9}/\S+$", re.I),         # DOI
+           re.compile(r"^(ARXIV:)?\d{4}\.\d{4,5}(v\d+)?$", re.I),  # new-style arXiv id
+           re.compile(r"^ARXIV:[a-z\-]+(\.[A-Z]{2})?/\d{7}$", re.I))  # old-style arXiv id
+
+
+def is_paper_id(text):
+    t = (text or "").strip()
+    return any(r.match(t) for r in _ID_RES)
+
+
+def canonical_id(text):
+    """Add the DOI:/ARXIV: prefix Semantic Scholar expects when it is missing."""
+    t = (text or "").strip()
+    if re.match(r"^10\.\d{4,9}/", t):
+        return "DOI:" + t
+    if re.match(r"^\d{4}\.\d{4,5}(v\d+)?$", t):
+        return "ARXIV:" + re.sub(r"v\d+$", "", t)
+    return t
+
+
 URL_RE = re.compile(r"^\s*(https?://|www\.)", re.I)
 URL_HELP = ("URLs are not accepted. Use keywords for a search, or a paper id: "
             "DOI:10.xxxx/..., ARXIV:2404.19756, or a Semantic Scholar hash. "

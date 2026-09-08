@@ -17,6 +17,7 @@ All list commands share these options:
 | Option | Meaning |
 |---|---|
 | `-n N` | maximum results (default 15, API cap 100) |
+| `--sort relevance\|citations\|year` | order of the printed list (default relevance, the fused ranking) |
 | `--abstracts` | print the first 350 characters of each abstract |
 | `--json` | print the full records as JSON instead of text |
 | `--out FILE` | also write the list; the extension picks the format: `.bib`, `.ris`, `.csv`, `.json`, `.md` |
@@ -58,6 +59,20 @@ litsurvey refs    ID [-n N]   # papers it cites, most cited first
 litsurvey related ID [-n N]   # similar papers from Semantic Scholar's recommender
 ```
 
+**A title works too.** If the argument is not an id, litsurvey searches for
+it. An exact title match is used straight away (a `[note] using: …` line
+says which paper). Otherwise it prints up to eight candidates with their
+ids and, at a terminal, asks you to pick one; `--sort citations` or
+`--sort year` orders that list. In a script or from an agent (no terminal)
+it prints the list and exits with code 2; rerun with the id, or add
+`--pick N` to take candidate N without asking:
+
+```console
+$ litsurvey cites "superior thermal conductivity graphene" --pick 1
+[note] using: Superior Thermal Conductivity of Single-Layer Graphene (2008) id DOI:10.1021/nl0731872
+1. **Two-Dimensional Phonon Transport in Supported Graphene** …
+```
+
 `cites` and `refs` walk the citation graph. `related` uses a recommendation
 model on Semantic Scholar's servers, which finds papers on the same topic
 that use different words. All four use Semantic Scholar only; a paper that
@@ -71,7 +86,9 @@ litsurvey oa DOI [--json] [--out FILE]
 ```
 
 Asks Unpaywall for a legal open-access copy: the author's preprint, an
-institutional repository copy, or the publisher's open version.
+institutional repository copy, or the publisher's open version. A title
+is accepted in place of the DOI, with the same candidate choice as above;
+a paper without a DOI cannot be looked up.
 
 ```console
 $ litsurvey oa 10.1016/j.cma.2022.114823

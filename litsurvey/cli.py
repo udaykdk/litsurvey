@@ -10,6 +10,8 @@ from . import __version__, backends, config, export, history, http, ops, papers
 
 def _add_list_opts(p):
     p.add_argument("-n", type=int, default=15, help="max results (default 15)")
+    p.add_argument("--sort", choices=["relevance", "citations", "year"], default="relevance",
+                   help="order of the printed list (default relevance; also orders a candidate list)")
     p.add_argument("--abstracts", action="store_true", help="show abstract snippets")
     p.add_argument("--json", action="store_true", help="print JSON to stdout")
     p.add_argument("--out", metavar="FILE",
@@ -28,10 +30,31 @@ def _add_agent_opts(p):
 
 
 def _print_papers(args, plist):
+    plist = ops.sort_papers(plist, getattr(args, "sort", "relevance"))
     if args.json:
         print(export.to_json(plist), end="")
     else:
         print(ops.papers_text(plist, snippet=350 if args.abstracts else 0))
+
+
+def _choose(result, args):
+    """Title given instead of an id: let a person pick; scripts get the list and a hint."""
+    sort = getattr(args, "sort", "relevance")
+    print(ops.candidates_text(result, sort), file=sys.stderr)
+    if not sys.stdin.isatty():
+        sys.exit(2)
+    plist = ops.sort_papers(result["candidates"], sort)
+    while True:
+        try:
+            ans = input(f"Which paper? [1-{len(plist)}, q to quit] ").strip().lower()
+        except EOFError:
+            sys.exit(2)
+        if ans in ("q", ""):
+            sys.exit(2)
+        if ans.isdigit() and 1 <= int(ans) <= len(plist):
+            chosen = plist[int(ans) - 1]
+            print(f"[note] using: {chosen['title']} ({chosen['year']})", file=sys.stderr)
+            return papers.best_id(chosen)
 
 
 def cmd_list_mode(mode):
@@ -40,7 +63,13 @@ def cmd_list_mode(mode):
         if mode == "search":
             params["year_from"] = args.year_from
             params["sources"] = args.sources.split(",") if args.sources else None
+        else:
+            params["pick"] = getattr(args, "pick", None)
         result = ops.run_mode(mode, params)
+        if result.get("needs_choice"):
+            params["text"] = _choose(result, args)
+            params.pop("pick", None)
+            result = ops.run_mode(mode, params)
         _print_papers(args, result["papers"])
         if mode == "search" and args.scholar:
             print(f"\nGoogle Scholar (manual check): {papers.scholar_url(args.text)}")
@@ -52,9 +81,14 @@ def cmd_list_mode(mode):
 
 
 def cmd_oa(args):
-    result = ops.run_mode("oa", {"text": args.doi})
+    params = {"text": args.doi, "pick": args.pick}
+    result = ops.run_mode("oa", params)
+    if result.get("needs_choice"):
+        params["text"] = _choose(result, args)
+        params.pop("pick", None)
+        result = ops.run_mode("oa", params)
     print(json.dumps(result["oa"], indent=2) if args.json else ops.oa_text(result["oa"]))
-    ops.save("oa", {"text": args.doi}, result, out=args.out)
+    ops.save("oa", params, result, out=args.out)
 
 
 def cmd_agent_mode(mode):
@@ -227,12 +261,16 @@ def build_parser():
                            ("refs", "papers the given paper cites (backward snowball)"),
                            ("related", "similar papers via recommendation engine")):
         p = sub.add_parser(mode, help=helptext)
-        p.add_argument("text", metavar="ID", help="S2 hash, DOI:10.…, or ARXIV:2404.19756")
+        p.add_argument("text", metavar="ID_OR_TITLE",
+                       help="S2 hash, DOI:10.…, ARXIV:2404.19756, or a paper title (you will be asked to pick)")
+        p.add_argument("--pick", type=int, metavar="N", help="with a title: take candidate N without asking")
         _add_list_opts(p)
         p.set_defaults(fn=cmd_list_mode(mode))
 
     p = sub.add_parser("oa", help="find a legal open-access copy of a DOI (Unpaywall)")
-    p.add_argument("doi")
+    p.add_argument("doi", metavar="DOI_OR_TITLE")
+    p.add_argument("--pick", type=int, metavar="N")
+    p.add_argument("--sort", choices=["relevance", "citations", "year"], default="relevance")
     p.add_argument("--json", action="store_true")
     p.add_argument("--out", metavar="FILE")
     p.set_defaults(fn=cmd_oa)

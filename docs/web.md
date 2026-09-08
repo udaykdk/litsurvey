@@ -36,6 +36,11 @@ forms to flags.
 While an agent runs, the progress lines (`[agent] search_papers(...)`)
 stream into a dark box, so you can see the queries as they are made.
 
+If you typed a title where an id was expected, the page searches for it
+and shows the closest papers with a "Use this paper" button on each; the
+lookup you asked for runs on the one you pick. Every paper list has sort
+buttons: relevance (the fused ranking), citations, or year.
+
 Results appear below: a paper list with links, citation counts and IDs, or
 the rendered report with a collapsible search log. Download buttons give
 BibTeX, RIS, CSV, JSON or Markdown of the same run. For a search, a link
