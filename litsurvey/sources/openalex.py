@@ -77,14 +77,32 @@ def citing(work_id, limit=20, sort="citations"):
     return [_map(w) for w in data.get("results", [])]
 
 
-def references(work, limit=20, sort="citations"):
-    """Works the given work record cites (its referenced_works), sorted."""
-    ids = [r.rsplit("/", 1)[-1] for r in (work.get("referenced_works") or [])]
+def works_by_ids(ids, limit=200):
+    """Fetch work records for a list of W... ids (50 per request)."""
+    ids = [r.rsplit("/", 1)[-1] for r in ids][:limit]
     out = []
-    for i in range(0, min(len(ids), 200), 50):
+    for i in range(0, len(ids), 50):
         chunk = "|".join(ids[i:i + 50])
         data = http.get_json(f"{BASE}/works?" + _params({"filter": f"openalex:{chunk}", "per-page": "50"}))
         out.extend(_map(w) for w in data.get("results", []))
+    return out
+
+
+def _sorted(out, sort, limit):
     key = (lambda p: p["year"] or 0) if sort == "year" else (lambda p: p["citations"])
     out.sort(key=key, reverse=True)
     return out[:limit]
+
+
+def references(work, limit=20, sort="citations"):
+    """Works the given work record cites (its referenced_works), sorted."""
+    return _sorted(works_by_ids(work.get("referenced_works") or []), sort, limit)
+
+
+def related(work, limit=20, sort="citations"):
+    """OpenAlex's related_works for a work record (fallback for Semantic Scholar's recommender)."""
+    return _sorted(works_by_ids(work.get("related_works") or []), sort, limit)
+
+
+def paper_by_doi(doi):
+    return _map(work_by_doi(doi))

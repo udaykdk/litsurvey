@@ -39,9 +39,11 @@ def best_id(p):
 
 
 def merge(result_lists, k=60):
-    """Dedupe across sources and fuse rankings with reciprocal rank fusion."""
+    """Dedupe across sources and fuse rankings with reciprocal rank fusion.
+    Each element is a result list, or a (list, weight) pair."""
     papers, scores = {}, {}
-    for results in result_lists:
+    for item in result_lists:
+        results, weight = (item if isinstance(item, tuple) else (item, 1.0))
         for rank, p in enumerate(results):
             kk = key(p)
             if kk in papers:
@@ -55,7 +57,7 @@ def merge(result_lists, k=60):
                     q["authors"] = p["authors"]
             else:
                 papers[kk] = dict(p)
-            scores[kk] = scores.get(kk, 0.0) + 1.0 / (k + rank)
+            scores[kk] = scores.get(kk, 0.0) + weight / (k + rank)
     return [papers[kk] for kk in sorted(papers, key=lambda x: scores[x], reverse=True)]
 
 

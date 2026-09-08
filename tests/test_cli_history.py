@@ -132,3 +132,19 @@ def test_linked_papers_falls_back_when_openalex_is_empty(monkeypatch):
     notes = []
     out = ops.linked_papers("refs", "DOI:10.1234/x", 5, "citations", notes.append)
     assert out[0]["title"] == "from s2 refs" and any("trying Semantic Scholar" in n for n in notes)
+
+
+def test_related_and_paper_fall_back_to_openalex(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("HTTP Error 429")
+    monkeypatch.setattr(ops.semanticscholar, "related", boom)
+    monkeypatch.setattr(ops.semanticscholar, "paper", boom)
+    monkeypatch.setattr(ops.openalex, "work_by_doi", lambda doi: {"id": "W1", "related_works": ["W2"]})
+    monkeypatch.setattr(ops.openalex, "works_by_ids", lambda ids, limit=200: [P.make(title="via openalex related", citations=3)])
+    monkeypatch.setattr(ops.openalex, "paper_by_doi", lambda doi: P.make(title="record via openalex"))
+    notes = []
+    assert ops.related_papers("DOI:10.1234/x", 5, "relevance", notes.append)[0]["title"] == "via openalex related"
+    assert any("using OpenAlex" in n for n in notes)
+    assert ops.paper_record("DOI:10.1234/x", notes.append)["title"] == "record via openalex"
+    with pytest.raises(RuntimeError, match="no DOI"):
+        ops.related_papers("abc123", 5, "relevance", notes.append)

@@ -1,20 +1,36 @@
-"""Search across all sources and fuse the results."""
+"""Search across the sources and fuse the results."""
 import sys
 
 from .. import papers
-from . import arxiv, openalex, semanticscholar
+from . import arxiv, crossref, iacr, openalex, semanticscholar
 
-SOURCES = {"openalex": openalex.search, "s2": semanticscholar.search, "arxiv": arxiv.search}
+# name -> (search function, rank-fusion weight). The three big indexes carry full
+# weight; single-portal sources carry half so a niche preprint does not outrank
+# a well-cited paper merely by being first in its own short list.
+SOURCES = {
+    "openalex": (openalex.search, 1.0),
+    "s2": (semanticscholar.search, 1.0),
+    "arxiv": (arxiv.search, 1.0),
+    "techrxiv": (crossref.portal("techrxiv"), 0.5),
+    "researchsquare": (crossref.portal("researchsquare"), 0.5),
+    "iacr": (iacr.search, 0.5),
+    "crossref": (crossref.search, 0.7),   # all DOI-registered works; off by default (overlaps OpenAlex)
+}
+DEFAULT_SOURCES = ("openalex", "s2", "arxiv", "techrxiv", "researchsquare", "iacr")
 
 
 def run_search(query, limit=20, year_from=None, sources=None):
     """Returns (papers, stats). stats = {source: hit count or 'error: ...'}."""
-    names = [s for s in (sources or SOURCES) if s in SOURCES]
+    names = [s for s in (sources or DEFAULT_SOURCES) if s in SOURCES]
+    unknown = [s for s in (sources or ()) if s not in SOURCES]
+    if unknown:
+        raise ValueError(f"unknown source(s) {unknown}; choose from {list(SOURCES)}")
     lists, stats = [], {}
     for name in names:
+        fn, weight = SOURCES[name]
         try:
-            res = SOURCES[name](query, limit=limit, year_from=year_from)
-            lists.append(res)
+            res = fn(query, limit=limit, year_from=year_from)
+            lists.append((res, weight))
             stats[name] = len(res)
         except Exception as e:  # noqa: BLE001 - one source failing must not stop the rest
             stats[name] = f"error: {e}"

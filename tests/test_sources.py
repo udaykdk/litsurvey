@@ -1,5 +1,5 @@
 from litsurvey import http
-from litsurvey.sources import arxiv, openalex, semanticscholar, unpaywall
+from litsurvey.sources import arxiv, crossref, iacr, openalex, semanticscholar, unpaywall
 from litsurvey.sources import run_search
 
 OA = {"results": [{
@@ -97,9 +97,12 @@ def test_run_search_merges_and_survives_a_failing_source(monkeypatch):
         raise ConnectionError("arxiv down")
     monkeypatch.setattr(http, "get_json", get_json)
     monkeypatch.setattr(http, "get", get)
-    plist, stats = run_search("deep thing")
+    plist, stats = run_search("deep thing", sources=["openalex", "s2", "arxiv"])
     assert len(plist) == 1 and plist[0]["sources"] == ["openalex", "s2"]
     assert stats["openalex"] == 1 and stats["s2"] == 1 and stats["arxiv"].startswith("error")
+    import pytest
+    with pytest.raises(ValueError, match="unknown source"):
+        run_search("x", sources=["nope"])
 
 
 def test_openalex_citing_and_references(monkeypatch):
@@ -121,3 +124,41 @@ def test_openalex_citing_and_references(monkeypatch):
     assert openalex.citing(w["id"], limit=5)[0]["title"] == "Deep Thing"
     refs = openalex.references(w, limit=5)
     assert [p["title"] for p in refs] == ["Big", "Deep Thing"]     # most cited first
+
+
+CR = {"message": {"items": [{
+    "DOI": "10.36227/techrxiv.1.v1", "title": ["A TechRxiv Preprint"], "issued": {"date-parts": [[2025, 3, 1]]},
+    "author": [{"given": "Ann", "family": "Author"}], "is-referenced-by-count": 4,
+    "abstract": "<jats:p>Hello <i>world</i></jats:p>", "URL": "https://doi.org/10.36227/techrxiv.1.v1"}]}}
+
+
+def test_crossref_portal_map_and_prefix_filter(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(http, "get_json", lambda url, **k: seen.setdefault("url", url) and CR)
+    p = crossref.portal("techrxiv")("neural", limit=5, year_from=2024)[0]
+    assert "prefix%3A10.36227" in seen["url"] and "from-pub-date%3A2024-01-01" in seen["url"]
+    assert p["title"] == "A TechRxiv Preprint" and p["year"] == 2025 and p["venue"] == "TechRxiv"
+    assert p["authors"] == ["Ann Author"] and p["abstract"] == "Hello world" and p["sources"] == ["techrxiv"]
+    assert p["doi"] == "10.36227/techrxiv.1.v1"
+
+
+IACR_HTML = """<div class="mb-4"> <div class="d-flex"><a title="2026/1885" class="paperlink" href="/2026/1885">2026/1885</a>
+<span class="ms-2"><a href="/2026/1885.pdf">(PDF)</a></span> <small class="ms-auto">Last updated: 2026-09-03</small> </div>
+<div class="ms-md-4"> <div> <strong>Compact Lattice-Based NIZK Arguments &amp; Ring Signatures</strong>
+<div class="mt-1"><span class="fst-italic">Nam Tran, Khoa Nguyen, Dongxi Liu</span></div> </div>
+<p class="mb-0 mt-1 search-abstract">Zero-knowledge proofs of set membership underpin privacy-preserving constructions...</p> </div> </div>
+<div class="mb-4"> <div class="d-flex"><a title="2019/12" class="paperlink" href="/2019/12">2019/12</a></div>
+<div> <strong>Old Paper</strong> <div class="mt-1"><span class="fst-italic">Solo Author</span></div> </div>
+<p class="search-abstract">old</p> </div>"""
+
+
+def test_iacr_parse(monkeypatch):
+    out = iacr.parse(IACR_HTML)
+    assert len(out) == 2
+    p = out[0]
+    assert p["title"] == "Compact Lattice-Based NIZK Arguments & Ring Signatures" and p["year"] == 2026
+    assert p["authors"] == ["Nam Tran", "Khoa Nguyen", "Dongxi Liu"] and p["url"] == "https://eprint.iacr.org/2026/1885"
+    assert p["abstract"].startswith("Zero-knowledge") and p["venue"] == "IACR ePrint"
+    assert len(iacr.parse(IACR_HTML, year_from=2020)) == 1
+    monkeypatch.setattr(http, "get", lambda url, **k: IACR_HTML.encode())
+    assert iacr.search("lattice", limit=1)[0]["year"] == 2026

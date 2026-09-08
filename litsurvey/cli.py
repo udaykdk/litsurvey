@@ -184,7 +184,7 @@ def cmd_init(args):
 
 
 def cmd_doctor(args):
-    from .sources import arxiv, openalex, semanticscholar
+    from .sources import arxiv, crossref, iacr, openalex, semanticscholar
     cfg = config.load()
     ok = True
     print(f"litsurvey {__version__}, python {sys.version.split()[0]}")
@@ -196,14 +196,21 @@ def cmd_doctor(args):
         print("config       : none yet (optional; `litsurvey init` stores the key and email)")
     print(f"S2 API key   : {'set (' + cfg['s2_api_key'][:4] + '…)' if cfg['s2_api_key'] else 'NOT SET (works, shared pool, rate-limited)'}")
     print(f"email        : {cfg['openalex_mailto'] or 'not set (polite pools unavailable)'}")
-    for name, fn in (("openalex", openalex.search), ("semanticscholar", semanticscholar.search),
-                     ("arxiv", arxiv.search)):
+    for name, fn, q in (("openalex", openalex.search, "attention transformer"),
+                        ("semanticscholar", semanticscholar.search, "attention transformer"),
+                        ("arxiv", arxiv.search, "attention transformer"),
+                        ("techrxiv", crossref.portal("techrxiv"), "neural network"),
+                        ("researchsquare", crossref.portal("researchsquare"), "neural network"),
+                        ("iacr", iacr.search, "lattice signature")):
         try:
-            r = fn("attention transformer", limit=2)
-            print(f"{name:13s}: OK ({len(r)} results)")
+            r = fn(q, limit=2)
+            print(f"{name:14s}: OK ({len(r)} results)")
+            if name == "iacr" and not r:
+                print("               (0 results: IACR's search page may have changed; other sources unaffected)")
         except Exception as e:  # noqa: BLE001
-            ok = False
-            print(f"{name:13s}: FAIL - {e}")
+            if name in ("openalex", "semanticscholar", "arxiv"):
+                ok = False
+            print(f"{name:14s}: FAIL - {e}")
     try:
         names = backends.ollama_models()
         print(f"ollama       : OK at {cfg['ollama_host']} ({len(names)} models: {', '.join(names[:5])})")
@@ -254,12 +261,13 @@ def build_parser():
     p = sub.add_parser("search", help="keyword search across OpenAlex + Semantic Scholar + arXiv")
     p.add_argument("text", metavar="QUERY")
     p.add_argument("--year-from", type=int, metavar="YEAR")
-    p.add_argument("--sources", help="comma list, e.g. openalex,s2 (default all)")
+    p.add_argument("--sources", help="comma list from openalex,s2,arxiv,techrxiv,researchsquare,iacr,crossref "
+                                     "(default: all except crossref)")
     p.add_argument("--scholar", action="store_true", help="also print a Google Scholar URL for the query")
     _add_list_opts(p)
     p.set_defaults(fn=cmd_list_mode("search"))
 
-    for mode, helptext in (("paper", "details of one paper"),
+    for mode, helptext in (("paper", "one paper's full record (abstract, DOI, ids); --out x.bib for its BibTeX"),
                            ("cites", "papers citing the given paper (forward snowball)"),
                            ("refs", "papers the given paper cites (backward snowball)"),
                            ("related", "similar papers via recommendation engine")):

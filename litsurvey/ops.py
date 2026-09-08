@@ -65,11 +65,11 @@ def run_mode(mode, params, progress=None):
                                   sources=params.get("sources"))
         return {"papers": plist[:n], "stats": stats}
     if mode == "paper":
-        return {"papers": [semanticscholar.paper(text)]}
+        return {"papers": [paper_record(text, progress)]}
     if mode in ("cites", "refs"):
         return {"papers": linked_papers(mode, text, n, params.get("sort") or "citations", progress)}
     if mode == "related":
-        return {"papers": semanticscholar.related(text, limit=n)}
+        return {"papers": related_papers(text, n, params.get("sort") or "relevance", progress)}
     if mode == "oa":
         return {"oa": unpaywall.lookup(text)}
     if mode in AGENT_MODES:
@@ -77,6 +77,36 @@ def run_mode(mode, params, progress=None):
                          model=params.get("model"), rounds=int(params.get("rounds") or 8),
                          progress=progress)
     raise ValueError(f"unknown mode {mode!r}")
+
+
+def _say(progress):
+    return progress or (lambda s: print(s, file=__import__("sys").stderr))
+
+
+def paper_record(pid, progress=None):
+    """One paper's record: Semantic Scholar first, OpenAlex when the id is a DOI."""
+    try:
+        return semanticscholar.paper(pid)
+    except Exception as e:  # noqa: BLE001
+        if not pid.upper().startswith("DOI:"):
+            raise
+        _say(progress)(f"[warn] Semantic Scholar failed ({e}); using OpenAlex")
+        return openalex.paper_by_doi(pid[4:])
+
+
+def related_papers(pid, n, sort, progress=None):
+    """Similar papers: Semantic Scholar's recommender first; OpenAlex related_works
+    as the fallback when it fails and the paper has a DOI."""
+    say = _say(progress)
+    try:
+        return sort_papers(semanticscholar.related(pid, limit=n), sort)
+    except Exception as e:  # noqa: BLE001
+        if not pid.upper().startswith("DOI:"):
+            raise RuntimeError(f"Semantic Scholar recommendations failed ({e}) and this id has no DOI "
+                               f"for the OpenAlex fallback; try again in a minute or use the DOI") from None
+        say(f"[warn] Semantic Scholar recommendations failed ({e}); using OpenAlex related works")
+    work = openalex.work_by_doi(pid[4:])
+    return openalex.related(work, limit=n, sort=sort if sort != "relevance" else "citations")
 
 
 def linked_papers(mode, pid, n, sort, progress=None):

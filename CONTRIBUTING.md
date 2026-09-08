@@ -27,9 +27,13 @@ add a fixture for the new response shape in `tests/test_sources.py`.
 - **Zero runtime dependencies.** Standard library only. This keeps
   installation trivial on university machines and inside agents. If a
   feature needs a dependency, make it optional and import it lazily.
-- **Only public, official APIs.** No scraping of sites whose terms forbid
-  it (Google Scholar in particular). New sources must have a documented API
-  and a rate limit we can honour in `http.HOST_INTERVAL`.
+- **Only public, official APIs, with one documented exception.** No
+  scraping of sites whose terms forbid it (Google Scholar in particular).
+  New sources should have a documented API and a rate limit we can honour in
+  `http.HOST_INTERVAL`. The IACR ePrint source reads a server-rendered
+  search page because the archive offers no search API and does not
+  prohibit it; it is rate-limited to one request per two seconds and is
+  isolated so that a markup change only silences that source.
 - **Nothing leaves the machine that the docs do not say leaves.** Any change
   to what is sent where must be reflected in `docs/confidentiality.md`.
 - **Every run is recorded** in the history store, with per-source hit

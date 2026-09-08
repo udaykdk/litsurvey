@@ -30,11 +30,17 @@ Every run is recorded in the history (see `history` below).
 litsurvey search "QUERY" [--year-from YEAR] [--sources openalex,s2,arxiv] [--scholar] [list options]
 ```
 
-Queries OpenAlex, Semantic Scholar and arXiv, de-duplicates by DOI, arXiv ID
-or title, and merges the three rankings with reciprocal rank fusion. A paper
-found by more than one source ranks higher and shows `[openalex+s2]`.
-`--scholar` prints a Google Scholar URL for the same query, for a manual
-comparison. `--sources` restricts the sources.
+Queries OpenAlex, Semantic Scholar, arXiv, TechRxiv, Research Square and
+the IACR ePrint archive, de-duplicates by DOI, arXiv ID or title, and merges
+the rankings with weighted reciprocal rank fusion (the three big indexes
+carry full weight, the single-portal sources half). A paper found by more
+than one source ranks higher and shows `[openalex+s2]`. `--scholar` prints
+a Google Scholar URL for the same query, for a manual comparison.
+`--sources openalex,s2,arxiv,techrxiv,researchsquare,iacr,crossref`
+restricts or extends the set; `crossref` (every DOI-registered work) is off
+by default because it largely overlaps OpenAlex. IACR results carry no DOI
+or Semantic Scholar id, so they appear in searches but cannot be used with
+`cites`, `refs` or `related`.
 
 ```console
 $ litsurvey search "physics informed neural networks inverse problems" -n 2 --year-from 2022
@@ -79,8 +85,10 @@ citing works server-side, so a paper with thousands of citations shows its
 most influential citers rather than the newest few. Papers without a DOI
 fall back to Semantic Scholar, whose citation lists come newest first.
 `related` uses a recommendation model on Semantic Scholar's servers, which
-finds papers on the same topic that use different words. A paper with no
-Semantic Scholar record gives an error; try the DOI form of the id.
+finds papers on the same topic that use different words. When Semantic
+Scholar is unavailable (it returns 429 or 500 under load), `related` and
+`paper` fall back to OpenAlex for any paper with a DOI, with a `[warn]`
+line saying so; only ids without a DOI then fail.
 
 ## oa
 

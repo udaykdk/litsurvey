@@ -86,3 +86,10 @@ def test_clean_text_collapses_blank_lines_and_quotes():
     assert P.clean_text("Superior Thermal\n\n  Conductivity\r\n of\tGraphene\n") == "Superior Thermal Conductivity of Graphene"
     assert P.clean_text(' "Quoted Title" ') == "Quoted Title"
     assert P.normalize_input("https://doi.org/10.1234/x\n")[0] == "DOI:10.1234/x"
+
+
+def test_merge_weights_keep_niche_portals_below_major_indexes():
+    major = [mk(title="Major", doi="10/m")]
+    niche = [mk(title="Niche", doi="10/n")]
+    merged = P.merge([(major, 1.0), (niche, 0.5)])
+    assert [p["title"] for p in merged] == ["Major", "Niche"]

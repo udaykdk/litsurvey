@@ -57,7 +57,7 @@ litsurvey novelty "..." --backend ollama --model qwen3:30b  # fully local
 
 | Command | LLM | What is sent out, and to whom |
 |---|---|---|
-| `search`, `paper`, `cites`, `refs`, `related` | no | your query or a paper ID, to OpenAlex, Semantic Scholar, arXiv |
+| `search`, `paper`, `cites`, `refs`, `related` | no | your query or a paper ID, to OpenAlex, Semantic Scholar, arXiv, Crossref and eprint.iacr.org |
 | `oa` | no | one DOI, to Unpaywall |
 | `history`, `init`, `doctor`, `web` | no | nothing (doctor makes one test query per source) |
 | `novelty`, `research` with the **cli** backend (Claude Code, Codex CLI, Gemini CLI) | yes, vendor cloud | your claim or question and everything the agent reads, to that vendor under your subscription |
@@ -79,10 +79,15 @@ confidential manuscript, is in [docs/confidentiality.md](docs/confidentiality.md
 
 ## Coverage, and Google Scholar
 
-OpenAlex indexes about 250 million works, Semantic Scholar about 220 million,
-and arXiv covers preprints in physics, mathematics, computer science and
-neighbouring fields. Together they cover most of what Google Scholar shows,
-except some grey literature (technical reports, theses, standards).
+Six sources are searched by default: OpenAlex (about 250 million works),
+Semantic Scholar (about 220 million), arXiv, and three preprint portals:
+TechRxiv and Research Square (through Crossref, by their DOI prefixes) and
+the IACR Cryptology ePrint Archive (which has no search API, so litsurvey
+reads its search page; if that page changes, only that source goes quiet).
+`--sources` restricts the set; `crossref` (all DOI-registered works) can be
+added but overlaps OpenAlex. Together they cover most of what Google
+Scholar shows, except some grey literature (technical reports, theses,
+standards).
 Google Scholar has no API and its terms of service forbid automated access,
 so litsurvey does not scrape it. `litsurvey search --scholar` prints the
 matching Google Scholar URL so you can compare by hand, and the web page has

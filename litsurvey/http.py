@@ -18,6 +18,8 @@ HOST_INTERVAL = {
     "export.arxiv.org": 3.0,          # arXiv asks for 3 s between requests
     "api.openalex.org": 0.15,
     "api.unpaywall.org": 0.2,
+    "api.crossref.org": 0.2,
+    "eprint.iacr.org": 2.0,           # no API; be gentle with their search page
 }
 _last_call = {}
 DEBUG = False
@@ -55,10 +57,10 @@ def _retry_after(err, attempt):
             return min(float(ra), 60.0)
     except (TypeError, ValueError):
         pass
-    return float(2 ** (attempt + 1))
+    return float(min(2 ** (attempt + 1), 20))     # 2, 4, 8, 16 s
 
 
-def get(url, headers=None, timeout=30, retries=4):
+def get(url, headers=None, timeout=30, retries=5):
     """GET url and return the raw bytes. Retries 429/5xx and network errors."""
     host = urllib.parse.urlparse(url).netloc
     hdrs = {"User-Agent": USER_AGENT}
