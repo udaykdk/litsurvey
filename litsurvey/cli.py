@@ -137,7 +137,12 @@ def cmd_doctor(args):
     cfg = config.load()
     ok = True
     print(f"litsurvey {__version__}, python {sys.version.split()[0]}")
-    print(f"config       : {config.CONFIG_PATH} ({'found' if os.path.exists(config.CONFIG_PATH) else 'not found'})")
+    if os.path.exists(config.CONFIG_PATH):
+        print(f"config       : {config.CONFIG_PATH}")
+    elif os.path.exists(config.LEGACY_PATH):
+        print(f"config       : {config.LEGACY_PATH} (older litsearch file, still read; `litsurvey init` writes the new one)")
+    else:
+        print("config       : none yet (optional; `litsurvey init` stores the key and email)")
     print(f"S2 API key   : {'set (' + cfg['s2_api_key'][:4] + '…)' if cfg['s2_api_key'] else 'NOT SET (works, shared pool, rate-limited)'}")
     print(f"email        : {cfg['openalex_mailto'] or 'not set (polite pools unavailable)'}")
     for name, fn in (("openalex", openalex.search), ("semanticscholar", semanticscholar.search),
@@ -155,12 +160,26 @@ def cmd_doctor(args):
         print(f"ollama       : not running ({type(e).__name__}); novelty/research need a backend")
     print(f"openai       : {'key set' if cfg['openai_api_key'] else 'no key'}, base {cfg['openai_base_url']}")
     print(f"anthropic    : {'key set' if cfg['anthropic_api_key'] else 'no key'}")
+    agent_line = None
     try:
         be, model = backends.resolve()
-        print(f"agent default: backend={be} model={model}"
-              f" ({'local' if be in backends.LOCAL_BACKENDS else 'CLOUD'})")
+        local = be in backends.LOCAL_BACKENDS
+        print(f"agent default: backend={be} model={model} ({'local' if local else 'CLOUD'})")
+        agent_line = f"novelty/research will use {be} model {model} ({'local' if local else 'CLOUD'})"
+        if not cfg["model"] and be == "ollama":
+            agent_line += "; set a different default with `litsurvey init`"
     except Exception as e:  # noqa: BLE001
         print(f"agent default: none ({e})")
+    print()
+    if not ok:
+        print("RESULT: PROBLEMS. One or more sources failed (see FAIL lines above); "
+              "search results will be incomplete. Check your network, then `litsurvey doctor --debug`.")
+    elif agent_line:
+        print("RESULT: ALL OK. Search, citation and open-access commands work; " + agent_line + ".")
+    else:
+        print("RESULT: OK for search. novelty/research are unavailable until an LLM backend "
+              "is set up (see docs/llm-integration.md); everything else works.")
+    print("You do not need to run doctor regularly: use it after install, or when something fails.")
     sys.exit(0 if ok else 1)
 
 

@@ -133,6 +133,15 @@ litsurvey init      # asks for the Semantic Scholar key, your email, and the LLM
 litsurvey doctor    # checks every API and backend; paste its output into bug reports
 ```
 
+Neither command is required. `init` is the convenient way to store the
+key; `doctor` is a diagnostic. Run `doctor` once after installing, to
+confirm the key and any LLM backend are seen, and again whenever a command
+fails. It makes one small test query per source and ends with a one-line
+verdict: `RESULT: ALL OK`, `RESULT: OK for search` (no LLM backend), or
+`RESULT: PROBLEMS`. A few `[warn] HTTP 429` lines before a source reports
+OK are normal; they mean the API rate-limited the request and the retry
+succeeded.
+
 ```console
 $ litsurvey doctor
 litsurvey 1.0.0, python 3.12.4
@@ -146,6 +155,9 @@ ollama       : OK at http://localhost:11434 (3 models: qwen3:30b, gemma3:27b, â€
 openai       : no key, base https://api.openai.com
 anthropic    : no key
 agent default: backend=ollama model=qwen3:30b (local)
+
+RESULT: ALL OK. Search, citation and open-access commands work; novelty/research will use ollama model qwen3:30b (local).
+You do not need to run doctor regularly: use it after install, or when something fails.
 ```
 
 Environment variables override the config file: `S2_API_KEY`,

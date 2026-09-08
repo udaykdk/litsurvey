@@ -27,7 +27,9 @@ python3 -m litsurvey --help
 
 Optional but recommended, one minute: get a free Semantic Scholar API key
 and run `litsurvey init` to store it. Without a key everything still works,
-only slower. See [docs/api-keys.md](docs/api-keys.md).
+only slower. See [docs/api-keys.md](docs/api-keys.md). `litsurvey doctor`
+checks the setup and ends with a one-line verdict; run it once after
+installing, and again if something fails.
 
 ## Quick start
 
