@@ -66,10 +66,11 @@ def run_mode(mode, params, progress=None):
         return {"papers": plist[:n], "stats": stats}
     if mode == "paper":
         return {"papers": [semanticscholar.paper(text)]}
-    if mode == "cites":
-        return {"papers": semanticscholar.linked(text, "citations", limit=n)}
-    if mode == "refs":
-        return {"papers": semanticscholar.linked(text, "references", limit=n)}
+    if mode in ("cites", "refs"):
+        # one request either way: fetch a larger page so "most cited first" is
+        # chosen from a real sample, not from the API's first few rows
+        direction = "citations" if mode == "cites" else "references"
+        return {"papers": semanticscholar.linked(text, direction, limit=max(n, 100))[:n]}
     if mode == "related":
         return {"papers": semanticscholar.related(text, limit=n)}
     if mode == "oa":
