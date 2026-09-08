@@ -17,6 +17,10 @@ def run_mode(mode, params, progress=None):
     text = (params.get("text") or "").strip()
     if not text:
         raise ValueError("input text is empty")
+    text, note = papers.normalize_input(text)
+    if note:
+        params["text"] = text
+        (progress or (lambda s: print(s, file=__import__("sys").stderr)))("[note] " + note)
     n = int(params.get("n") or 15)
     if mode == "search":
         plist, stats = run_search(text, limit=n, year_from=params.get("year_from"),

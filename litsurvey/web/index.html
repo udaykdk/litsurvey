@@ -7,10 +7,23 @@
 <style>
   :root { --bg:#fafaf7; --fg:#1d1d1b; --muted:#6b6b66; --line:#d9d9d2; --accent:#0b5fa5; --ok:#1e7b3a; --warn:#b3540a; --card:#fff; }
   body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
-  header { display:flex; align-items:baseline; gap:18px; padding:14px 22px; border-bottom:1px solid var(--line); background:#fff; }
-  header h1 { font-size:20px; margin:0; } header .v { color:var(--muted); font-size:13px; }
-  nav button { background:none; border:none; font-size:15px; padding:6px 10px; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; }
-  nav button.on { color:var(--fg); border-color:var(--accent); }
+  :root { --hero-img: none; }
+  header { position:relative; display:flex; align-items:center; gap:18px; padding:30px 22px 22px; color:#fff;
+           background: var(--hero-img) center / cover no-repeat,
+                       linear-gradient(180deg, #c99d55 0%, #e2c688 22%, #f2ead3 34%, #f9fafb 42%, #dbeaf5 50%, #7fb7e0 62%, #2d7fc0 78%, #135b96 100%);
+           text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+  header::before { content:""; position:absolute; inset:0; pointer-events:none;
+           background: repeating-linear-gradient(180deg, rgba(255,255,255,0) 0 9px, rgba(255,255,255,.22) 9px 11px, rgba(255,255,255,0) 11px 17px, rgba(0,40,80,.10) 17px 19px); }
+  header > * { position:relative; }
+  header .brand { display:flex; align-items:baseline; gap:12px; background:rgba(10,40,70,.45); border-radius:8px; padding:6px 14px; }
+  header h1 { font-size:24px; margin:0; letter-spacing:.01em; } header .v { color:#f4f8fb; font-size:13px; }
+  nav { display:flex; gap:4px; } nav button { background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.35); border-radius:6px; font-size:14px; padding:6px 12px; cursor:pointer; color:#fff; text-shadow:none; }
+  nav button.on { background:#fff; color:var(--accent); }
+  header .links { margin-left:auto; display:flex; gap:8px; } header .links a { color:#fff; background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.35); border-radius:6px; padding:5px 10px; font-size:13px; text-decoration:none; text-shadow:none; }
+  header .links a:hover { background:rgba(0,0,0,.35); }
+  .llmloc { display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border:1px dashed var(--line); border-radius:6px; }
+  .llmloc label { display:flex; gap:8px; align-items:flex-start; cursor:pointer; } .llmloc small { display:block; color:var(--muted); }
+  .llmloc .grp2 { flex-basis:100%; font-size:13px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
   main { max-width:1100px; margin:0 auto; padding:18px 22px 60px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin-bottom:16px; }
   fieldset { border:none; padding:0; margin:0 0 10px; }
@@ -46,8 +59,9 @@
 </head>
 <body>
 <header>
-  <h1>litsurvey</h1><span class="v">v{{VERSION}} · local literature search</span>
+  <span class="brand"><h1>litsurvey</h1><span class="v">v{{VERSION}} · local literature search</span></span>
   <nav><button id="tabRun" class="on">Run</button><button id="tabHist">History</button></nav>
+  <span class="links"><a id="docsLink" href="#" target="_blank" rel="noopener">Docs</a><a id="bugLink" href="#" target="_blank" rel="noopener">Report a bug</a></span>
 </header>
 <main>
 <section id="run">
@@ -67,11 +81,17 @@
         <label><input type="radio" name="mode" value="novelty"><span>Novelty<small>prior-art verdict for a claim</small></span></label>
         <label><input type="radio" name="mode" value="research"><span>Research<small>cited state-of-the-art survey for a question</small></span></label>
       </div>
+      <div id="llmloc" class="llmloc hidden">
+        <span class="grp2">Where does the LLM run?</span>
+        <label><input type="radio" name="llmloc" value="local" checked><span>Local<small>Ollama on this machine; your text never leaves it</small></span></label>
+        <label><input type="radio" name="llmloc" value="cloud"><span>Cloud<small>OpenAI-compatible or Anthropic API; your text is sent to the provider</small></span></label>
+      </div>
       <div class="row" style="margin-top:14px"><label style="flex:1"><span id="inLabel">Keyword query</span><textarea id="text" placeholder="e.g. physics informed neural networks inverse problems"></textarea></label></div>
+      <div id="urlNote" class="note warn hidden"></div>
       <div class="row">
         <label id="optN">Max results<input type="number" id="n" value="15" min="1" max="100" style="width:80px"></label>
         <label id="optYear">From year<input type="number" id="year" placeholder="any" style="width:90px"></label>
-        <label id="optBackend">Backend<select id="backend"><option value="">auto</option><option value="ollama">ollama (local)</option><option value="openai">openai-compatible</option><option value="anthropic">anthropic</option></select></label>
+        <label id="optBackend">Provider<select id="backend"><option value="openai">openai-compatible</option><option value="anthropic">anthropic</option></select></label>
         <label id="optModel">Model<input type="text" id="model" list="models" placeholder="default" style="width:200px"><datalist id="models"></datalist></label>
         <label id="optRounds">Max rounds<input type="number" id="rounds" value="8" min="1" max="30" style="width:70px"></label>
         <label style="flex:1">Output file (optional; extension picks format: .bib .ris .csv .json .md)<input type="text" id="out" placeholder="/absolute/path/results.bib"></label>
@@ -105,28 +125,55 @@ let CONFIG = {};
 function mode(){ return document.querySelector('input[name=mode]:checked').value; }
 function esc(s){ return String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
+function llmLocal(){ return document.querySelector('input[name=llmloc]:checked').value === "local"; }
+function chosenBackend(){ return llmLocal() ? "ollama" : $("backend").value; }
+
 function refreshForm(){
   const m = mode(); $("inLabel").textContent = LABELS[m];
   const isAgent = AGENT.has(m);
   $("optN").classList.toggle("hidden", isAgent || m==="oa" || m==="paper");
   $("optYear").classList.toggle("hidden", m!=="search");
-  for (const id of ["optBackend","optModel","optRounds"]) $(id).classList.toggle("hidden", !isAgent);
-  $("rounds").value = m==="research" ? 12 : 8;
+  $("llmloc").classList.toggle("hidden", !isAgent);
+  $("optBackend").classList.toggle("hidden", !isAgent || llmLocal());
+  for (const id of ["optModel","optRounds"]) $(id).classList.toggle("hidden", !isAgent);
+  if (!$("rounds").dataset.touched) $("rounds").value = m==="research" ? 12 : 8;
+  $("model").placeholder = llmLocal() ? ((CONFIG.ollama_models||[])[0] || "e.g. qwen3:30b") : ($("backend").value==="anthropic" ? "e.g. claude-sonnet-5" : "e.g. gpt-5");
   const p = $("privacy");
-  if (!isAgent) { p.className="note ok"; p.textContent = m==="oa" ? "No LLM involved. Only the DOI is sent to Unpaywall." : "No LLM involved. Only this query or ID is sent to the scholarly APIs (OpenAlex, Semantic Scholar, arXiv)."; return; }
-  const be = $("backend").value || CONFIG.backend || "auto";
-  const local = be==="ollama" || (be==="auto" && CONFIG.ollama);
-  if (local) { p.className="note ok"; p.textContent = "Local backend (Ollama). Your text stays on this machine; only the generic keyword queries the model composes are sent to the scholarly APIs."; }
-  else if (be==="auto") { p.className="note warn"; p.textContent = "No local backend detected. If a cloud key is configured, your text WILL be sent to that provider. Start Ollama for a fully local run."; }
-  else { p.className="note warn"; p.textContent = `Cloud backend (${be}): your claim/question text will be sent to that provider. Do not use for confidential manuscript content.`; }
+  if (!isAgent) { p.className="note ok"; p.textContent = m==="oa" ? "No LLM involved. Only the DOI is sent to Unpaywall." : "No LLM involved. Only this query or ID is sent to the scholarly APIs (OpenAlex, Semantic Scholar, arXiv)."; checkUrl(); return; }
+  if (llmLocal()) {
+    if (CONFIG.ollama) { p.className="note ok"; p.textContent = "Local model (Ollama). Your text stays on this machine; only the generic keyword queries the model composes are sent to the scholarly APIs."; }
+    else { p.className="note warn"; p.textContent = "Ollama is not running or not installed. Start it (or install it from ollama.com and pull a model), then reload this page. Nothing will be sent to any cloud provider."; }
+  } else {
+    const be = $("backend").value, has = be==="anthropic" ? CONFIG.anthropic_key : CONFIG.openai_key;
+    p.className="note warn"; p.textContent = `Cloud model (${be}): your claim or question text and every search result will be sent to that provider. Do not use for confidential manuscript content.` + (has ? "" : ` No ${be} API key is configured; run "litsurvey init" or set the environment variable.`);
+  }
+  checkUrl();
+}
+function checkUrl(){
+  const t = $("text").value.trim(), n = $("urlNote"), go = $("go");
+  if (!/^(https?:\/\/|www\.)/i.test(t)) { n.classList.add("hidden"); go.disabled = false; return; }
+  let conv = null, m;
+  if ((m = t.match(/doi\.org\/(10\.[^\s?#]+)/i))) conv = "DOI:" + m[1].replace(/\/$/, "");
+  else if ((m = t.match(/arxiv\.org\/(?:abs|pdf|html)\/([\w.\-\/]+?)(?:v\d+)?(?:\.pdf)?\/?(?:[?#].*)?$/i))) conv = "ARXIV:" + m[1];
+  else if ((m = t.match(/semanticscholar\.org\/paper\/(?:[^\/\s]+\/)*([0-9a-f]{40})/i))) conv = m[1];
+  n.classList.remove("hidden");
+  if (conv) { n.className = "note info"; n.innerHTML = `That is a URL. The tool needs an id; this one can be converted: <button class="small" id="useConv">Use <code>${esc(conv)}</code></button>`; $("useConv").onclick = ()=>{ $("text").value = conv; checkUrl(); }; go.disabled = false; }
+  else { n.className = "note warn"; n.textContent = "URLs do not work here. Use keywords for a search, or a paper id: DOI:10.xxxx/..., ARXIV:2404.19756, or a Semantic Scholar hash. For a publisher page (IEEE Xplore, Elsevier, Springer, ...) copy the DOI shown on that page and enter it as DOI:10.xxxx/..."; go.disabled = true; }
 }
 document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener("change", refreshForm));
+document.querySelectorAll('input[name=llmloc]').forEach(r=>r.addEventListener("change", refreshForm));
 $("backend").addEventListener("change", refreshForm);
+$("rounds").addEventListener("input", ()=>{ $("rounds").dataset.touched = "1"; });
+$("text").addEventListener("input", checkUrl);
 
 async function loadConfig(){
   try { CONFIG = await (await fetch("/api/config")).json(); } catch(e){ CONFIG = {}; }
   $("models").innerHTML = (CONFIG.ollama_models||[]).map(m=>`<option value="${esc(m)}">`).join("");
-  if (CONFIG.model) $("model").placeholder = CONFIG.model;
+  if (CONFIG.model) $("model").value = CONFIG.model;
+  if (!CONFIG.ollama && (CONFIG.openai_key || CONFIG.anthropic_key)) document.querySelector('input[name=llmloc][value=cloud]').checked = true;
+  if (CONFIG.backend === "anthropic" || CONFIG.backend === "openai") $("backend").value = CONFIG.backend;
+  if (CONFIG.issues_url) $("bugLink").href = CONFIG.issues_url + "&title=" + encodeURIComponent("[web] ") + "&body=" + encodeURIComponent(`litsurvey ${CONFIG.version} web interface\n\n**What happened**\n\n**Mode and input**\n\n**Output of litsurvey doctor**\n`);
+  if (CONFIG.repo_url) $("docsLink").href = CONFIG.repo_url + "#documentation";
   refreshForm();
 }
 
@@ -194,7 +241,7 @@ function renderResult(el, run, result, mode){
 async function run(){
   const m = mode(), text = $("text").value.trim();
   if (!text) { $("text").focus(); return; }
-  const body = {mode:m, text, n:$("n").value, year_from:$("year").value, backend:$("backend").value, model:$("model").value, rounds:$("rounds").value, out:$("out").value};
+  const body = {mode:m, text, n:$("n").value, year_from:$("year").value, backend:AGENT.has(m)?chosenBackend():"", model:$("model").value, rounds:$("rounds").value, out:$("out").value};
   $("go").disabled = true; $("status").classList.remove("hidden"); $("result").classList.add("hidden");
   $("statusLine").textContent = "Running…"; $("progress").textContent = ""; $("progress").classList.toggle("hidden", !AGENT.has(m));
   let job;

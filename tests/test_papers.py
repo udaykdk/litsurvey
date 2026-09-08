@@ -64,3 +64,19 @@ def test_throttle_uses_stamp_file(tmp_path, monkeypatch):
     http._throttle("example.test")          # second call must wait ~0.3 s
     assert time.monotonic() - t0 >= 0.25
     assert (tmp_path / ".ratelimit-example.test").exists()
+
+
+def test_normalize_input_converts_known_urls_and_rejects_others():
+    import pytest
+    n = P.normalize_input
+    assert n("  keyword query ") == ("keyword query", "")
+    assert n("https://doi.org/10.1016/j.cma.2022.114823")[0] == "DOI:10.1016/j.cma.2022.114823"
+    assert n("http://dx.doi.org/10.1/x/")[0] == "DOI:10.1/x"
+    assert n("https://arxiv.org/abs/2404.19756v3")[0] == "ARXIV:2404.19756"
+    assert n("https://arxiv.org/pdf/2404.19756.pdf")[0] == "ARXIV:2404.19756"
+    assert n("https://www.semanticscholar.org/paper/Some-Title/a68d501c2c1b292e558a7c80d34906b400f0c799")[0] \
+        == "a68d501c2c1b292e558a7c80d34906b400f0c799"
+    with pytest.raises(ValueError, match="copy the DOI"):
+        n("https://ieeexplore.ieee.org/document/10772013")
+    with pytest.raises(ValueError):
+        n("www.example.com/paper")

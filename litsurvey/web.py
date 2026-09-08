@@ -9,7 +9,9 @@ import uuid
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import __version__, backends, config, export, history, ops
+from . import __version__, backends, config, export, history, ops, papers
+
+REPO_URL = "https://github.com/udaykdk/litsurvey"
 
 JOBS = {}
 JOBS_LOCK = threading.Lock()
@@ -77,6 +79,8 @@ class Handler(BaseHTTPRequestHandler):
             if parts[:2] == ["api", "config"]:
                 cfg = config.load()
                 info = {"version": __version__, "backend": cfg["backend"] or "auto",
+                        "repo_url": REPO_URL,
+                        "issues_url": REPO_URL + "/issues/new?template=bug_report.md",
                         "model": cfg["model"], "s2_key": bool(cfg["s2_api_key"]),
                         "ollama_models": [], "ollama": False}
                 try:
@@ -136,6 +140,10 @@ class Handler(BaseHTTPRequestHandler):
             if "year_from" in params:
                 params["year_from"] = int(params["year_from"])
             out = (body.get("out") or "").strip() or None
+            try:
+                papers.normalize_input(params.get("text", ""))
+            except ValueError as e:
+                return self._json({"error": str(e)}, 400)
             return self._json({"job_id": _start_job(mode, params, out)})
         return self._json({"error": "not found"}, 404)
 

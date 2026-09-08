@@ -79,6 +79,30 @@ def compact(papers, n=8, abstract_chars=350):
              "abstract": (p["abstract"] or "")[:abstract_chars]} for p in papers[:n]]
 
 
+URL_RE = re.compile(r"^\s*(https?://|www\.)", re.I)
+URL_HELP = ("URLs are not accepted. Use keywords for a search, or a paper id: "
+            "DOI:10.xxxx/..., ARXIV:2404.19756, or a Semantic Scholar hash. "
+            "For a publisher page (IEEE Xplore, Elsevier, Springer, ...) copy the DOI shown on that page.")
+
+
+def normalize_input(text):
+    """Convert well-known paper URLs to ids; reject other URLs with guidance.
+    Returns (text, note). note is '' when nothing changed."""
+    t = (text or "").strip()
+    if not URL_RE.match(t):
+        return t, ""
+    m = re.search(r"doi\.org/(10\.[^\s?#]+)", t, re.I)
+    if m:
+        return "DOI:" + m.group(1).rstrip("/"), "converted DOI URL to " + "DOI:" + m.group(1).rstrip("/")
+    m = re.search(r"arxiv\.org/(?:abs|pdf|html)/([\w.\-/]+?)(?:v\d+)?(?:\.pdf)?/?(?:[?#].*)?$", t, re.I)
+    if m:
+        return "ARXIV:" + m.group(1), "converted arXiv URL to ARXIV:" + m.group(1)
+    m = re.search(r"semanticscholar\.org/paper/(?:[^/\s]+/)*([0-9a-f]{40})", t, re.I)
+    if m:
+        return m.group(1), "converted Semantic Scholar URL to its paper id"
+    raise ValueError(URL_HELP)
+
+
 def scholar_url(query):
     import urllib.parse
     return "https://scholar.google.com/scholar?q=" + urllib.parse.quote_plus(query)
