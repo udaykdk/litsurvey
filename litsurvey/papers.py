@@ -106,10 +106,17 @@ URL_HELP = ("URLs are not accepted. Use keywords for a search, or a paper id: "
             "For a publisher page (IEEE Xplore, Elsevier, Springer, ...) copy the DOI shown on that page.")
 
 
+def clean_text(text):
+    """Collapse newlines, tabs and repeated spaces (pasted titles often carry line
+    breaks) and strip surrounding whitespace and stray quotes."""
+    t = re.sub(r"\s+", " ", (text or "")).strip()
+    return t.strip("\"'\u201c\u201d ").strip()
+
+
 def normalize_input(text):
-    """Convert well-known paper URLs to ids; reject other URLs with guidance.
-    Returns (text, note). note is '' when nothing changed."""
-    t = (text or "").strip()
+    """Clean whitespace; convert well-known paper URLs to ids; reject other URLs
+    with guidance. Returns (text, note). note is '' when nothing changed."""
+    t = clean_text(text)
     if not URL_RE.match(t):
         return t, ""
     m = re.search(r"doi\.org/(10\.[^\s?#]+)", t, re.I)

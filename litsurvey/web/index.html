@@ -291,7 +291,7 @@ function renderResult(el, run, result, mode){
 }
 
 async function run(){
-  const m = mode(), text = $("text").value.trim();
+  const m = mode(), text = $("text").value.replace(/\s+/g, " ").trim();
   if (!text) { $("text").focus(); return; }
   const body = {mode:m, text, n:$("n").value, year_from:$("year").value, backend:AGENT.has(m)?chosenBackend():"", model:AGENT.has(m)?chosenModel():"", rounds:$("rounds").value, out:$("out").value};
   $("go").disabled = true; $("status").classList.remove("hidden"); $("result").classList.add("hidden");

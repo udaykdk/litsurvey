@@ -41,12 +41,12 @@ def resolve_title(text, params, progress=None):
 def run_mode(mode, params, progress=None):
     """params keys: text (query / id / doi / claim), n, year_from, sources,
     backend, model, rounds. Returns a result dict."""
-    text = (params.get("text") or "").strip()
+    text = papers.clean_text(params.get("text"))
     if not text:
         raise ValueError("input text is empty")
     text, note = papers.normalize_input(text)
+    params["text"] = text          # the cleaned form is what gets recorded
     if note:
-        params["text"] = text
         (progress or (lambda s: print(s, file=__import__("sys").stderr)))("[note] " + note)
     n = int(params.get("n") or 15)
     if mode in ID_MODES and not papers.is_paper_id(text):
