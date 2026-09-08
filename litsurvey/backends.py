@@ -9,14 +9,71 @@ Neutral tool format: {"name", "description", "parameters"} (JSON schema).
 chat() returns {"content": str, "tool_calls": [{"id", "name", "args"}]}.
 """
 import json
+import os
+import shlex
+import shutil
+import subprocess
 import sys
 import uuid
 
 from . import http
 from .config import CFG
 
-BACKENDS = ("ollama", "openai", "anthropic")
+BACKENDS = ("cli", "ollama", "openai", "anthropic")
 LOCAL_BACKENDS = ("ollama",)   # data never leaves the machine
+
+# Subscription command-line agents. Each is run non-interactively with the task as
+# its prompt; it uses the `litsurvey` command itself as its search tool.
+CLI_TOOLS = {
+    "claude": {"label": "Claude Code (Claude Pro / Max subscription)",
+               "argv": ["claude", "-p", "--output-format", "text",
+                        "--allowedTools", "Bash(litsurvey:*)"], "stdin": True},
+    "codex": {"label": "Codex CLI (ChatGPT subscription)",
+              "argv": ["codex", "exec", "--full-auto", "{prompt}"], "stdin": False},
+    "gemini": {"label": "Gemini CLI (Google account)",
+               "argv": ["gemini", "--yolo", "-o", "text", "-p", "{prompt}"], "stdin": False},
+}
+
+
+def cli_tools_available():
+    return [t for t in CLI_TOOLS if shutil.which(t)]
+
+
+def cli_command(tool):
+    """(argv, use_stdin) for a tool name or 'custom'."""
+    if tool == "custom":
+        if not CFG["cli_command"]:
+            raise RuntimeError("cli_tool=custom needs cli_command in the config")
+        argv = shlex.split(CFG["cli_command"])
+        return argv, not any("{prompt}" in a for a in argv)
+    if tool not in CLI_TOOLS:
+        raise RuntimeError(f"unknown CLI tool {tool!r}; use one of {list(CLI_TOOLS)} or custom")
+    if not shutil.which(tool):
+        raise RuntimeError(f"{tool!r} is not on PATH; install it and sign in, or choose another backend")
+    return list(CLI_TOOLS[tool]["argv"]), CLI_TOOLS[tool]["stdin"]
+
+
+def run_cli(tool, prompt, timeout=1800):
+    """Hand the whole task to a subscription CLI agent; return its final text."""
+    argv, use_stdin = cli_command(tool)
+    if not use_stdin:
+        argv = [a.replace("{prompt}", prompt) for a in argv]
+    env = dict(os.environ)
+    env.pop("CLAUDECODE", None)   # allow launching Claude Code from inside a Claude Code session
+    try:
+        proc = subprocess.run(argv, input=prompt if use_stdin else None, capture_output=True,
+                              text=True, timeout=timeout, env=env)
+    except FileNotFoundError:
+        raise RuntimeError(f"could not start {argv[0]!r}") from None
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"{tool} did not finish within {timeout} s") from None
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()[-800:]
+        raise RuntimeError(f"{tool} exited with code {proc.returncode}: {detail}")
+    out = proc.stdout.strip()
+    if not out:
+        raise RuntimeError(f"{tool} produced no output; stderr: {proc.stderr.strip()[-400:]}")
+    return out
 
 
 # ------------------------------------------------------------- resolution
@@ -36,20 +93,30 @@ def resolve(backend=None, model=None):
     """Pick (backend, model) from arguments, config, then auto-detection."""
     backend = (backend or CFG["backend"] or "auto").lower()
     if backend == "auto":
+        # safe order: local first, then a subscription CLI, then a cloud key
         try:
             ollama_models()
             backend = "ollama"
         except Exception:  # noqa: BLE001
-            if CFG["openai_api_key"] or "localhost" in CFG["openai_base_url"]:
+            if cli_tools_available():
+                backend = "cli"
+            elif CFG["openai_api_key"] or "localhost" in CFG["openai_base_url"]:
                 backend = "openai"
             elif CFG["anthropic_api_key"]:
                 backend = "anthropic"
             else:
                 raise RuntimeError(
-                    "no LLM backend found. Start Ollama, or set OPENAI_API_KEY / "
-                    "ANTHROPIC_API_KEY, or run `litsurvey init`.") from None
+                    "no LLM backend found. Start Ollama, install a subscription CLI "
+                    "(claude / codex / gemini), or set OPENAI_API_KEY / ANTHROPIC_API_KEY; "
+                    "`litsurvey init` stores a choice.") from None
     if backend not in BACKENDS:
         raise RuntimeError(f"unknown backend {backend!r}; use one of {BACKENDS}")
+    if backend == "cli":
+        tool = model or CFG["cli_tool"] or (cli_tools_available() or [None])[0]
+        if not tool:
+            raise RuntimeError("no subscription CLI found on PATH (claude, codex or gemini)")
+        cli_command(tool)   # validates
+        return backend, tool
     model = model or CFG["model"]
     if not model:
         if backend == "ollama":

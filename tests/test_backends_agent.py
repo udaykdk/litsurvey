@@ -1,6 +1,9 @@
 import json
+import sys
 
-from litsurvey import agent, backends, http
+import pytest
+
+from litsurvey import agent, backends, history, http
 
 MSGS = [{"role": "system", "content": "sys"},
         {"role": "user", "content": "hello"},
@@ -99,6 +102,7 @@ def test_agent_round_limit_forces_report(monkeypatch):
 
 def test_resolve_errors_without_backend(monkeypatch):
     monkeypatch.setattr(backends, "ollama_models", lambda host=None: (_ for _ in ()).throw(ConnectionError()))
+    monkeypatch.setattr(backends, "cli_tools_available", lambda: [])
     for k in ("backend", "openai_api_key", "anthropic_api_key"):
         monkeypatch.setitem(backends.CFG, k, "")
     monkeypatch.setitem(backends.CFG, "openai_base_url", "https://api.openai.com")
@@ -107,3 +111,39 @@ def test_resolve_errors_without_backend(monkeypatch):
         assert False
     except RuntimeError as e:
         assert "no LLM backend" in str(e)
+
+
+def test_cli_backend_custom_command_and_search_log(monkeypatch, tmp_path):
+    script = tmp_path / "fake_agent.py"
+    script.write_text("import sys; p = sys.stdin.read(); print('## Verdict\\nfake report,', len(p), 'chars of prompt')")
+    monkeypatch.setitem(backends.CFG, "cli_command", f"{sys.executable} {script}")
+    monkeypatch.setitem(backends.CFG, "backend", "cli")
+    monkeypatch.setitem(backends.CFG, "cli_tool", "custom")
+    assert backends.resolve(None, None) == ("cli", "custom")
+    real = backends.run_cli
+
+    def run_and_record(tool, prompt, timeout=1800):   # the agent's own litsurvey calls get recorded
+        assert "litsurvey search" in prompt and "Assess the novelty" in prompt
+        history.record("search", {"text": "kan pinn"}, papers=[], stats={"s2": 0, "openalex": 3})
+        history.record("cites", {"text": "DOI:10/x"}, papers=[{}])
+        return real(tool, prompt, timeout)
+    monkeypatch.setattr(backends, "run_cli", run_and_record)
+    res = agent.run("novelty", "some claim", backend="cli", rounds=2, progress=lambda s: None)
+    assert res["report"].startswith("## Verdict") and res["backend"] == "cli" and res["model"] == "custom"
+    assert [e["tool"] for e in res["log"]] == ["search_papers", "get_citations"]
+    assert res["log"][0]["args"] == {"query": "kan pinn"} and res["log"][0]["hits"] == {"s2": 0, "openalex": 3}
+    assert res["log"][1]["args"] == {"paper_id": "DOI:10/x"} and res["log"][1]["merged"] == 1
+
+
+def test_cli_backend_errors(monkeypatch):
+    monkeypatch.setitem(backends.CFG, "cli_command", "")
+    with pytest.raises(RuntimeError, match="cli_command"):
+        backends.cli_command("custom")
+    with pytest.raises(RuntimeError, match="unknown CLI tool"):
+        backends.cli_command("nope")
+    monkeypatch.setattr(backends.shutil, "which", lambda t: None)
+    with pytest.raises(RuntimeError, match="not on PATH"):
+        backends.cli_command("claude")
+    monkeypatch.setitem(backends.CFG, "cli_command", f"{sys.executable} -c \"import sys; sys.exit(3)\"")
+    with pytest.raises(RuntimeError, match="exited with code 3"):
+        backends.run_cli("custom", "hi")

@@ -18,8 +18,10 @@ def _add_list_opts(p):
 
 def _add_agent_opts(p):
     p.add_argument("--backend", choices=backends.BACKENDS,
-                   help="LLM backend (default: config, else auto-detect; ollama is the local one)")
-    p.add_argument("--model", help="model name for the backend")
+                   help="LLM backend: cli (your Claude Code / Codex / Gemini subscription CLI), "
+                        "ollama (local), openai, anthropic. Default: config, else auto-detect "
+                        "(local first)")
+    p.add_argument("--model", help="model name; for --backend cli the tool name: claude, codex, gemini or custom")
     p.add_argument("--rounds", type=int, default=8, help="max tool-calling rounds (default 8)")
     p.add_argument("--out", metavar="FILE", help="save the report as markdown (+ FILE.log.json)")
     p.add_argument("--no-log", action="store_true", help="omit the search-log appendix")
@@ -108,15 +110,27 @@ def cmd_init(args):
     if mail:
         vals["openalex_mailto"] = mail
     print("\nLLM backend for novelty/research (leave blank to auto-detect at run time):")
-    print("  ollama    - local, nothing leaves the machine")
-    print("  openai    - OpenAI-compatible API (OpenAI, LM Studio, vLLM, OpenRouter)")
-    print("  anthropic - Anthropic API")
+    print("  cli       - your subscription's command-line agent: Claude Code, Codex CLI or Gemini CLI")
+    print("  ollama    - local model, nothing leaves the machine")
+    print("  openai    - OpenAI-compatible API key (OpenAI, LM Studio, vLLM, OpenRouter)")
+    print("  anthropic - Anthropic API key")
     be = input(f"backend [{cur['backend'] or 'auto'}]: ").strip().lower()
     if be:
         vals["backend"] = be
-    model = input(f"default model name [{cur['model'] or 'auto'}]: ").strip()
-    if model:
-        vals["model"] = model
+    if (be or cur["backend"]) == "cli":
+        found = backends.cli_tools_available()
+        print(f"subscription CLIs found on PATH: {', '.join(found) or 'none'}")
+        tool = input(f"CLI tool (claude / codex / gemini / custom) [{cur['cli_tool'] or (found[0] if found else 'claude')}]: ").strip().lower()
+        if tool:
+            vals["cli_tool"] = tool
+        if (tool or cur["cli_tool"]) == "custom":
+            cmd = input("custom command (use {prompt} for the prompt, or it is passed on stdin): ").strip()
+            if cmd:
+                vals["cli_command"] = cmd
+    else:
+        model = input(f"default model name [{cur['model'] or 'auto'}]: ").strip()
+        if model:
+            vals["model"] = model
     if (be or cur["backend"]) == "openai":
         base = input(f"OpenAI-compatible base URL [{cur['openai_base_url']}]: ").strip()
         if base:
@@ -158,14 +172,17 @@ def cmd_doctor(args):
         print(f"ollama       : OK at {cfg['ollama_host']} ({len(names)} models: {', '.join(names[:5])})")
     except Exception as e:  # noqa: BLE001
         print(f"ollama       : not running ({type(e).__name__}); novelty/research need a backend")
+    found = backends.cli_tools_available()
+    print(f"subscr. CLIs : {', '.join(found) if found else 'none found'} (claude / codex / gemini on PATH)")
     print(f"openai       : {'key set' if cfg['openai_api_key'] else 'no key'}, base {cfg['openai_base_url']}")
     print(f"anthropic    : {'key set' if cfg['anthropic_api_key'] else 'no key'}")
     agent_line = None
     try:
         be, model = backends.resolve()
         local = be in backends.LOCAL_BACKENDS
-        print(f"agent default: backend={be} model={model} ({'local' if local else 'CLOUD'})")
-        agent_line = f"novelty/research will use {be} model {model} ({'local' if local else 'CLOUD'})"
+        where = "local" if local else ("subscription CLI, text goes to the vendor" if be == "cli" else "CLOUD")
+        print(f"agent default: backend={be} model={model} ({where})")
+        agent_line = f"novelty/research will use {be} {'tool' if be == 'cli' else 'model'} {model} ({where})"
         if not cfg["model"] and be == "ollama":
             agent_line += "; set a different default with `litsurvey init`"
     except Exception as e:  # noqa: BLE001

@@ -4,7 +4,7 @@ import json
 import sys
 import time
 
-from . import backends, papers
+from . import backends, history, papers
 from .sources import arxiv, run_search, semanticscholar
 
 CONFIDENTIALITY = """STRICT CONFIDENTIALITY RULE: search queries must be short generic keyword phrases about the topic (e.g. "ionic liquid passivation perovskite tandem"). NEVER put verbatim sentences, author names, or identifying phrasing from a manuscript into a query."""
@@ -78,6 +78,16 @@ TOOLS = [
          "required": ["arxiv_id"]}},
 ]
 
+CLI_TASK = """You are running non-interactively inside a script. Your only research tool is the shell command `litsurvey` (already installed). Map the tools named above to these commands and use nothing else (no web search, no browsing, no file writes):
+  search_papers   -> litsurvey search "generic keywords" -n 10 --json [--year-from YEAR]
+  get_citations   -> litsurvey cites <id> -n 10 --json
+  get_references  -> litsurvey refs <id> -n 10 --json
+  get_related     -> litsurvey related <id> -n 10 --json
+  read_paper      -> not available here; judge from abstracts
+<id> is the "id" field of a result (Semantic Scholar hash, DOI:..., or ARXIV:...).
+Run commands one at a time, never in parallel (the APIs allow 1 request/second). Use at most {budget} commands.
+When finished, print ONLY the final report in markdown. No preamble, no explanation of what you did."""
+
 KINDS = {"novelty": (NOVELTY_SYSTEM, "Assess the novelty of this claim:\n\n{text}", "novelty report"),
          "research": (RESEARCH_SYSTEM, "Research question:\n\n{text}", "research report")}
 
@@ -119,6 +129,8 @@ def run(kind, text, backend=None, model=None, rounds=8, progress=None):
     system, user_tmpl, kind_name = KINDS[kind]
     backend, model = backends.resolve(backend, model)
     say = progress or (lambda s: print(s, file=sys.stderr))
+    if backend == "cli":
+        return _run_cli(kind, text, model, rounds, say)
     local = backend in backends.LOCAL_BACKENDS
     say(f"[agent] backend={backend} model={model} "
         f"({'local, nothing leaves this machine except keyword queries' if local else 'CLOUD backend: the text below is sent to the provider'})")
@@ -148,6 +160,42 @@ def run(kind, text, backend=None, model=None, rounds=8, progress=None):
         final = backends.chat(backend, model, messages)["content"]
     return {"report": final, "log": log, "backend": backend, "model": model,
             "rounds_used": used}
+
+
+_CLI_MODE_TOOL = {"search": "search_papers", "cites": "get_citations", "refs": "get_references",
+                  "related": "get_related", "oa": "open_access", "paper": "paper"}
+
+
+def _run_cli(kind, text, tool, rounds, say):
+    """Delegate the whole task to a subscription CLI agent (Claude Code, Codex, Gemini)."""
+    system, user_tmpl, kind_name = KINDS[kind]
+    say(f"[agent] backend=cli tool={tool} (SUBSCRIPTION CLI: your text and everything the agent "
+        f"reads are sent to that vendor under your subscription)")
+    budget = max(4, rounds * 3)
+    prompt = (system + "\n\n" + CLI_TASK.format(budget=budget) + "\n\n"
+              + user_tmpl.format(text=text)
+              + f"\n\nToday's year is {time.localtime().tm_year}. Begin.")
+    say(f"[agent] handing over to {tool}; this can take several minutes and shows no progress "
+        f"until it finishes. Its litsurvey commands will appear in the search log.")
+    start = time.time()
+    report = backends.run_cli(tool, prompt)
+    log = []
+    for r in history.runs_since(start - 1):
+        if r["mode"] not in _CLI_MODE_TOOL:
+            continue
+        inp = r["inputs"].get("text", "")
+        key = "query" if r["mode"] == "search" else ("doi" if r["mode"] == "oa" else "paper_id")
+        entry = {"time": r["time"], "tool": _CLI_MODE_TOOL[r["mode"]], "args": {key: inp},
+                 "merged": r.get("n_results")}
+        try:
+            stats = history.load(r["id"]).get("stats")
+            if stats:
+                entry["hits"] = stats
+        except OSError:
+            pass
+        log.append(entry)
+    say(f"[agent] {tool} finished; {len(log)} litsurvey commands recorded")
+    return {"report": report, "log": log, "backend": "cli", "model": tool, "rounds_used": None}
 
 
 def search_log_markdown(log, backend=None, model=None):

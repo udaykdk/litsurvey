@@ -88,6 +88,8 @@ class Handler(BaseHTTPRequestHandler):
                     info["ollama"] = True
                 except Exception:  # noqa: BLE001
                     pass
+                info["cli_tools"] = backends.cli_tools_available() + (["custom"] if cfg["cli_command"] else [])
+                info["cli_tool"] = cfg["cli_tool"]
                 info["openai_key"] = bool(cfg["openai_api_key"])
                 info["anthropic_key"] = bool(cfg["anthropic_api_key"])
                 return self._json(info)

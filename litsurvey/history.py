@@ -52,3 +52,9 @@ def delete(run_id):
             rows = [line for line in f if line.strip() and json.loads(line)["id"] != run_id]
         with open(INDEX, "w", encoding="utf-8") as f:
             f.writelines(rows)
+
+
+def runs_since(epoch):
+    """Index entries recorded at or after the given time.time() value, oldest first."""
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(epoch))
+    return [r for r in reversed(list_runs(limit=100000)) if r["time"] >= stamp]

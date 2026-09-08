@@ -25,10 +25,10 @@
   header .links a:hover { background:rgba(0,0,0,.35); }
   .module { border-radius:8px; padding:12px 14px 10px; margin-bottom:10px; border:1px solid transparent; }
   .module.search { background:#fbf4e3; border-color:#ead9b2; }
-  .module.agent { background:#e8f1fa; border-color:#c3d9ee; display:grid; grid-template-columns:minmax(260px,1fr) minmax(300px,1.3fr); gap:6px 22px; align-items:start; }
-  .module .grp { margin-top:0; } .module.agent .grp { grid-column:1 / -1; }
-  .module.agent .modes { grid-template-columns:1fr; }
-  .llmloc { display:flex; gap:18px; flex-wrap:wrap; padding:10px 12px; border:1px solid #c3d9ee; border-radius:6px; background:rgba(255,255,255,.7); transition:opacity .15s; }
+  .module.agent { background:#e8f1fa; border-color:#c3d9ee; }
+  .module .grp { margin-top:0; }
+  .llmloc { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border:1px solid #c3d9ee; border-radius:6px; background:rgba(255,255,255,.7); transition:opacity .15s; }
+  .llmloc > label { flex:1 1 220px; }
   .llmloc.off { opacity:.4; pointer-events:none; }
   .llmloc label { display:flex; gap:8px; align-items:flex-start; cursor:pointer; } .llmloc small { display:block; color:var(--muted); }
   .llmloc .grp2 { flex-basis:100%; font-size:13px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
@@ -94,8 +94,9 @@
       </div>
       <div id="llmloc" class="llmloc off">
         <span class="grp2">Where does the LLM run?</span>
-        <label><input type="radio" name="llmloc" value="local" checked disabled><span>Local<small>Ollama on this machine; your text never leaves it</small></span></label>
-        <label><input type="radio" name="llmloc" value="cloud" disabled><span>Cloud<small>OpenAI-compatible or Anthropic API; your text is sent to the provider</small></span></label>
+        <label><input type="radio" name="llmloc" value="cli" disabled><span>Subscription CLI<small>Claude Code, Codex or Gemini CLI, signed in with your Claude Pro, ChatGPT or Google plan. Your text goes to that vendor.</small></span></label>
+        <label><input type="radio" name="llmloc" value="local" checked disabled><span>Local model<small>Ollama on this machine. Nothing leaves it.</small></span></label>
+        <label><input type="radio" name="llmloc" value="cloud" disabled><span>Cloud API key<small>OpenAI-compatible or Anthropic API. Your text goes to the provider.</small></span></label>
       </div>
       </div>
       <div class="row" style="margin-top:14px"><label style="flex:1"><span id="inLabel">Keyword query</span><textarea id="text" placeholder="e.g. physics informed neural networks inverse problems"></textarea></label></div>
@@ -103,6 +104,7 @@
       <div class="row">
         <label id="optN">Max results<input type="number" id="n" value="15" min="1" max="100" style="width:80px"></label>
         <label id="optYear">From year<input type="number" id="year" placeholder="any" style="width:90px"></label>
+        <label id="optTool">CLI tool<select id="clitool"></select></label>
         <label id="optBackend">Provider<select id="backend"><option value="openai">openai-compatible</option><option value="anthropic">anthropic</option></select></label>
         <label id="optModel">Model<input type="text" id="model" list="models" placeholder="default" style="width:200px"><datalist id="models"></datalist></label>
         <label id="optRounds">Max rounds<input type="number" id="rounds" value="8" min="1" max="30" style="width:70px"></label>
@@ -137,8 +139,10 @@ let CONFIG = {};
 function mode(){ return document.querySelector('input[name=mode]:checked').value; }
 function esc(s){ return String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
-function llmLocal(){ return document.querySelector('input[name=llmloc]:checked').value === "local"; }
-function chosenBackend(){ return llmLocal() ? "ollama" : $("backend").value; }
+function llmChoice(){ return document.querySelector('input[name=llmloc]:checked').value; }
+function llmLocal(){ return llmChoice() === "local"; }
+function chosenBackend(){ const c = llmChoice(); return c==="cli" ? "cli" : (c==="local" ? "ollama" : $("backend").value); }
+function chosenModel(){ return llmChoice()==="cli" ? $("clitool").value : $("model").value; }
 
 function refreshForm(){
   const m = mode(); $("inLabel").textContent = LABELS[m];
@@ -147,13 +151,22 @@ function refreshForm(){
   $("optYear").classList.toggle("hidden", m!=="search");
   $("llmloc").classList.toggle("off", !isAgent);
   document.querySelectorAll('input[name=llmloc]').forEach(r=>{ r.disabled = !isAgent; });
-  $("optBackend").classList.toggle("hidden", !isAgent || llmLocal());
-  for (const id of ["optModel","optRounds"]) $(id).classList.toggle("hidden", !isAgent);
+  const choice = llmChoice();
+  $("optTool").classList.toggle("hidden", !isAgent || choice!=="cli");
+  $("optBackend").classList.toggle("hidden", !isAgent || choice!=="cloud");
+  $("optModel").classList.toggle("hidden", !isAgent || choice==="cli");
+  $("optRounds").classList.toggle("hidden", !isAgent);
   if (!$("rounds").dataset.touched) $("rounds").value = m==="research" ? 12 : 8;
   $("model").placeholder = llmLocal() ? ((CONFIG.ollama_models||[])[0] || "e.g. qwen3:30b") : ($("backend").value==="anthropic" ? "e.g. claude-sonnet-5" : "e.g. gpt-5");
   const p = $("privacy");
   if (!isAgent) { p.className="note ok"; p.textContent = m==="oa" ? "No LLM involved. Only the DOI is sent to Unpaywall." : "No LLM involved. Only this query or ID is sent to the scholarly APIs (OpenAlex, Semantic Scholar, arXiv)."; checkUrl(); return; }
-  if (llmLocal()) {
+  if (choice === "cli") {
+    const tools = CONFIG.cli_tools || [], tool = $("clitool").value;
+    p.className = "note warn";
+    p.textContent = tools.length
+      ? `Subscription CLI (${tool}): your claim or question and everything the agent reads are sent to that vendor under your subscription. Not for confidential manuscripts. The tool must already be signed in (run it once in a terminal).`
+      : "No subscription CLI found on PATH (claude, codex or gemini). Install one and sign in, then reload this page; or choose Local model.";
+  } else if (llmLocal()) {
     if (CONFIG.ollama) { p.className="note ok"; p.textContent = "Local model (Ollama). Your text stays on this machine; only the generic keyword queries the model composes are sent to the scholarly APIs."; }
     else { p.className="note warn"; p.textContent = "Ollama is not running or not installed. Start it (or install it from ollama.com and pull a model), then reload this page. Nothing will be sent to any cloud provider."; }
   } else {
@@ -174,8 +187,9 @@ function checkUrl(){
   else { n.className = "note warn"; n.textContent = "URLs do not work here. Use keywords for a search, or a paper id: DOI:10.xxxx/..., ARXIV:2404.19756, or a Semantic Scholar hash. For a publisher page (IEEE Xplore, Elsevier, Springer, ...) copy the DOI shown on that page and enter it as DOI:10.xxxx/..."; go.disabled = true; }
 }
 document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener("change", refreshForm));
-document.querySelectorAll('input[name=llmloc]').forEach(r=>r.addEventListener("change", refreshForm));
+document.querySelectorAll('input[name=llmloc]').forEach(r=>r.addEventListener("change", ()=>{ try { localStorage.setItem("litsurvey.llmloc", llmChoice()); } catch(e){} refreshForm(); }));
 $("backend").addEventListener("change", refreshForm);
+$("clitool").addEventListener("change", refreshForm);
 $("rounds").addEventListener("input", ()=>{ $("rounds").dataset.touched = "1"; });
 $("text").addEventListener("input", checkUrl);
 
@@ -183,7 +197,13 @@ async function loadConfig(){
   try { CONFIG = await (await fetch("/api/config")).json(); } catch(e){ CONFIG = {}; }
   $("models").innerHTML = (CONFIG.ollama_models||[]).map(m=>`<option value="${esc(m)}">`).join("");
   if (CONFIG.model) $("model").value = CONFIG.model;
-  if (!CONFIG.ollama && (CONFIG.openai_key || CONFIG.anthropic_key)) document.querySelector('input[name=llmloc][value=cloud]').checked = true;
+  const LABELS_CLI = {claude:"Claude Code (Claude Pro / Max)", codex:"Codex CLI (ChatGPT)", gemini:"Gemini CLI (Google)", custom:"custom command (config)"};
+  $("clitool").innerHTML = (CONFIG.cli_tools||[]).map(t=>`<option value="${esc(t)}">${esc(LABELS_CLI[t]||t)}</option>`).join("") || `<option value="">none found</option>`;
+  if (CONFIG.cli_tool && (CONFIG.cli_tools||[]).includes(CONFIG.cli_tool)) $("clitool").value = CONFIG.cli_tool;
+  let choice = null; try { choice = localStorage.getItem("litsurvey.llmloc"); } catch(e){}
+  const avail = {cli: (CONFIG.cli_tools||[]).length>0, local: true, cloud: true};
+  if (!choice || !avail[choice]) choice = (CONFIG.cli_tools||[]).length ? "cli" : (CONFIG.ollama ? "local" : ((CONFIG.openai_key||CONFIG.anthropic_key) ? "cloud" : "local"));
+  document.querySelector(`input[name=llmloc][value=${choice}]`).checked = true;
   if (CONFIG.backend === "anthropic" || CONFIG.backend === "openai") $("backend").value = CONFIG.backend;
   if (CONFIG.issues_url) $("bugLink").href = CONFIG.issues_url + "&title=" + encodeURIComponent("[web] ") + "&body=" + encodeURIComponent(`litsurvey ${CONFIG.version} web interface\n\n**What happened**\n\n**Mode and input**\n\n**Output of litsurvey doctor**\n`);
   if (CONFIG.repo_url) $("docsLink").href = CONFIG.repo_url + "#documentation";
@@ -254,7 +274,7 @@ function renderResult(el, run, result, mode){
 async function run(){
   const m = mode(), text = $("text").value.trim();
   if (!text) { $("text").focus(); return; }
-  const body = {mode:m, text, n:$("n").value, year_from:$("year").value, backend:AGENT.has(m)?chosenBackend():"", model:$("model").value, rounds:$("rounds").value, out:$("out").value};
+  const body = {mode:m, text, n:$("n").value, year_from:$("year").value, backend:AGENT.has(m)?chosenBackend():"", model:AGENT.has(m)?chosenModel():"", rounds:$("rounds").value, out:$("out").value};
   $("go").disabled = true; $("status").classList.remove("hidden"); $("result").classList.add("hidden");
   $("statusLine").textContent = "Running…"; $("progress").textContent = ""; $("progress").classList.toggle("hidden", !AGENT.has(m));
   let job;

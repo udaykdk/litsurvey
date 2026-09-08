@@ -87,7 +87,10 @@ litsurvey novelty  "CLAIM"    [--backend B] [--model M] [--rounds N] [--out FILE
 litsurvey research "QUESTION" [--backend B] [--model M] [--rounds N] [--out FILE.md] [--no-log]
 ```
 
-These need an LLM backend; see [llm-integration.md](llm-integration.md).
+These need an LLM backend: `--backend cli` (your Claude Code / Codex /
+Gemini subscription CLI; `--model` names the tool), `--backend ollama`
+(local), or `--backend openai` / `anthropic` (API keys). See
+[llm-integration.md](llm-integration.md).
 The model plans keyword queries, calls the search tools, walks citations of
 near hits, may read one or two arXiv papers in full, and writes a report.
 

@@ -42,12 +42,15 @@ litsurvey search "graphene thermal conductivity" --out refs.bib   # BibTeX, RIS,
 litsurvey web                                             # the same, in your browser
 ```
 
-With an LLM backend (a local Ollama model, or an OpenAI-compatible or
-Anthropic API):
+With an LLM backend, any one of: the command-line agent of a subscription
+you already have (Claude Code, Codex CLI or Gemini CLI), a local Ollama
+model, or an OpenAI-compatible or Anthropic API key:
 
 ```bash
 litsurvey novelty "adaptive collocation sampling in physics-informed neural networks" --out claim.md
 litsurvey research "neural network surrogates for topology optimization: approaches and open problems" --out survey.md
+litsurvey novelty "..." --backend cli --model claude        # use Claude Code under your Claude subscription
+litsurvey novelty "..." --backend ollama --model qwen3:30b  # fully local
 ```
 
 ## What needs an LLM, and what leaves your machine
@@ -57,6 +60,7 @@ litsurvey research "neural network surrogates for topology optimization: approac
 | `search`, `paper`, `cites`, `refs`, `related` | no | your query or a paper ID, to OpenAlex, Semantic Scholar, arXiv |
 | `oa` | no | one DOI, to Unpaywall |
 | `history`, `init`, `doctor`, `web` | no | nothing (doctor makes one test query per source) |
+| `novelty`, `research` with the **cli** backend (Claude Code, Codex CLI, Gemini CLI) | yes, vendor cloud | your claim or question and everything the agent reads, to that vendor under your subscription |
 | `novelty`, `research` with the **ollama** backend | yes, local | only the keyword queries the model composes, to the same three APIs |
 | `novelty`, `research` with **openai** or **anthropic** | yes, cloud | your claim or question text, and every search result, to that provider |
 

@@ -9,6 +9,8 @@ Keys (all optional):
   openai_base_url   default https://api.openai.com (LM Studio: http://localhost:1234)
   openai_api_key
   anthropic_api_key
+  cli_tool          subscription CLI for the "cli" backend: claude | codex | gemini | custom
+  cli_command       custom command line for cli_tool=custom; {prompt} placeholder or prompt on stdin
 """
 import json
 import os
@@ -26,6 +28,8 @@ ENV_MAP = {
     "openai_base_url": ("OPENAI_BASE_URL",),
     "openai_api_key": ("OPENAI_API_KEY",),
     "anthropic_api_key": ("ANTHROPIC_API_KEY",),
+    "cli_tool": ("LITSURVEY_CLI_TOOL",),
+    "cli_command": ("LITSURVEY_CLI_COMMAND",),
 }
 
 DEFAULTS = {
@@ -37,6 +41,8 @@ DEFAULTS = {
     "openai_base_url": "https://api.openai.com",
     "openai_api_key": "",
     "anthropic_api_key": "",
+    "cli_tool": "",
+    "cli_command": "",
 }
 
 

@@ -18,9 +18,13 @@ forms to flags.
    *LLM agent* (needs a backend). Each has a one-line description.
 2. **Input box.** Its label changes with the mode: keyword query, paper ID,
    DOI, claim, or research question.
-3. **Options.** Max results and a from-year for searches; backend, model
-   and max rounds for the agent modes. The model box offers the Ollama
-   models it can see.
+3. **Options.** Max results and a from-year for searches. For the agent
+   modes, a box asks where the LLM runs, with three choices in the order
+   most people have them: a subscription command-line agent (Claude Code,
+   Codex CLI, Gemini CLI), a local Ollama model, or a cloud API key. The
+   box is greyed out until Novelty or Research is selected, and the page
+   remembers your last choice. The model box offers the Ollama models it
+   can see.
 4. **Output file.** Optional. An absolute path; the extension picks the
    format (`.bib`, `.ris`, `.csv`, `.json`, `.md`). Agent reports are always
    Markdown and get a `.log.json` beside them.

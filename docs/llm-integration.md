@@ -9,23 +9,78 @@ This page covers two different things:
 
 ## Part 1: backends for `novelty` and `research`
 
-| Backend | Runs where | Setup |
-|---|---|---|
-| `ollama` | locally | install Ollama, `ollama pull <model>` |
-| `openai` | wherever the base URL points | `OPENAI_BASE_URL`, `OPENAI_API_KEY` if the server needs one |
-| `anthropic` | Anthropic's API | `ANTHROPIC_API_KEY` |
+Three ways to supply the model, in the order most people will have them:
+
+| Option | Backend name | Runs where | Setup |
+|---|---|---|---|
+| 1. The command-line agent of a subscription you already pay for: Claude Code (Claude Pro / Max), Codex CLI (ChatGPT), Gemini CLI (Google) | `cli` | the vendor's servers | install the tool, sign in once in a terminal |
+| 2. A local model | `ollama` | your machine | install Ollama, `ollama pull <model>` |
+| 3. An API key for a cloud model | `openai`, `anthropic` | the provider's servers | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`; `OPENAI_BASE_URL` for compatible servers |
 
 Selection order: `--backend` flag, then `backend` in the config file, then
-auto-detection (Ollama if it is running, else a configured cloud key).
-`litsurvey doctor` prints what will be used. The model comes from
-`--model`, then the config, then a backend default (for Ollama, the first
-installed model).
+auto-detection. Auto-detection is deliberately conservative: a running
+Ollama wins, then an installed subscription CLI, then a configured cloud
+key. `litsurvey doctor` prints what will be used.
 
-Set a permanent choice with `litsurvey init`, or:
+Set a permanent choice with `litsurvey init`, or write the config:
 
 ```json
+{ "backend": "cli", "cli_tool": "claude" }
 { "backend": "ollama", "model": "qwen3:30b" }
 ```
+
+### Option 1: your subscription's command-line agent
+
+If you have Claude Pro or Max, ChatGPT Plus or Pro, or a Google account
+with Gemini access, you probably already have (or can install) the matching
+command-line agent: `claude` (Claude Code), `codex` (Codex CLI) or `gemini`
+(Gemini CLI). These tools are signed in with your subscription, so no API
+key is involved.
+
+The mechanism is different from the other backends. litsurvey does not run
+the search loop itself; it hands the whole task to the agent in
+non-interactive mode, with the same instructions the built-in loop uses,
+and tells it to use the `litsurvey` command as its only tool. The agent
+runs `litsurvey search`, `cites`, `refs` and `related` as it sees fit and
+prints the report. Every one of those commands is recorded in the history,
+so the saved report still ends with a complete search log.
+
+```bash
+litsurvey novelty "conformal prediction intervals for PINN solutions" --backend cli --model claude --out claim.md
+litsurvey research "..." --backend cli --model gemini
+```
+
+For `--backend cli`, `--model` names the tool: `claude`, `codex`, `gemini`,
+or `custom`. The commands used are:
+
+| Tool | Command litsurvey runs |
+|---|---|
+| claude | `claude -p --output-format text --allowedTools "Bash(litsurvey:*)"`, prompt on stdin |
+| codex | `codex exec --full-auto "<prompt>"` |
+| gemini | `gemini --yolo -o text -p "<prompt>"` |
+| custom | whatever `cli_command` in the config says; `{prompt}` is substituted, otherwise the prompt is passed on stdin |
+
+Things to know:
+
+- Sign in first by running the tool once interactively. If it is signed
+  out, litsurvey reports the tool's error (for Claude Code, "OAuth session
+  expired").
+- Your claim or question and everything the agent reads go to that vendor
+  under your subscription's terms. This is not the option for confidential
+  manuscripts; use option 2.
+- There is no progress display while the agent works; a run typically takes
+  one to five minutes. The `[agent]` line at the start says which tool is
+  running.
+- Codex CLI's sandbox blocks network access by default in some
+  configurations, which stops litsurvey's API calls. If runs fail with
+  network errors, allow network in your Codex config, or use the `custom`
+  tool with the flags your version needs.
+- Only the Claude Code command has been tested by the author; the Codex and
+  Gemini commands follow their documented flags. Reports welcome.
+- `--rounds` becomes a command budget for the agent (about three commands
+  per round).
+
+### Option 2: a local model
 
 ### Local models that work well
 
@@ -60,7 +115,7 @@ export OPENAI_BASE_URL=http://localhost:1234
 litsurvey novelty "..." --backend openai --model <name shown by the server>
 ```
 
-### Cloud backends
+### Option 3: cloud API keys
 
 `--backend openai` with the default base URL, or `--backend anthropic`. Your
 input text and every search result are sent to the provider. Do not use for
