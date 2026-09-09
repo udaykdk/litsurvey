@@ -27,7 +27,7 @@ def _start_job(mode, params, out):
     job_id = uuid.uuid4().hex[:10]
     job = {"id": job_id, "mode": mode, "status": "running", "progress": [],
            "started": time.time(), "result": None, "run_id": None, "error": None,
-           "written": [], "current": ""}
+           "written": [], "current": "", "note": ""}
     with JOBS_LOCK:
         JOBS[job_id] = job
 
@@ -35,10 +35,11 @@ def _start_job(mode, params, out):
         job["progress"].append(line)
 
     def reporter(kind, text):
-        if kind == "current":
+        if kind == "current":       # a new attempt or a finished request: the retry note is over
             job["current"] = text
+            job["note"] = ""
         else:
-            job["progress"].append("[wait] " + text)
+            job["note"] = text
 
     def work():
         http.set_reporter(reporter)
