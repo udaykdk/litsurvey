@@ -106,10 +106,10 @@ def get(url, headers=None, timeout=30, retries=5):
     name = friendly(host)
     try:
         for attempt in range(retries):
+            _report("current", name)      # before the throttle pause, so the wait is attributed
             _throttle(host)
             if DEBUG:
                 print(f"[http] GET {url}", file=sys.stderr)
-            _report("current", name)
             try:
                 req = urllib.request.Request(url, headers=hdrs)
                 with urllib.request.urlopen(req, timeout=timeout) as r:
