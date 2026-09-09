@@ -64,6 +64,9 @@
   .dl { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
   .hidden { display:none !important; }
   .muted { color:var(--muted); font-size:13px; }
+  footer { max-width:1100px; margin:0 auto; padding:10px 22px 26px; color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; border-top:1px solid var(--line); }
+  footer .flag { width:16px; height:11px; vertical-align:-1px; margin-right:6px; border:1px solid #ddd; }
+  footer .quote { font-style:italic; margin-left:auto; text-align:right; }
 </style>
 </head>
 <body>
@@ -129,8 +132,29 @@
   <div id="histResult" class="card hidden"></div>
 </section>
 </main>
+<footer>
+  <span><svg class="flag" viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg" aria-label="India"><rect width="30" height="20" fill="#f93"/><rect y="6.67" width="30" height="6.67" fill="#fff"/><rect y="13.33" width="30" height="6.67" fill="#128807"/><circle cx="15" cy="10" r="2.6" fill="none" stroke="#008" stroke-width=".7"/><circle cx="15" cy="10" r=".5" fill="#008"/></svg>Uday Khankhoje (IIT Madras)</span>
+  <span class="quote" id="quote"></span>
+</footer>
 <script>
 const $ = id => document.getElementById(id);
+const YOGI = [
+  "It ain't over till it's over.", "When you come to a fork in the road, take it.",
+  "You can observe a lot by just watching.", "It's like déjà vu all over again.",
+  "Nobody goes there anymore. It's too crowded.", "Baseball is ninety percent mental. The other half is physical.",
+  "The future ain't what it used to be.", "If you don't know where you are going, you might wind up someplace else.",
+  "I never said most of the things I said.", "In theory there is no difference between theory and practice. In practice there is.",
+  "If the world were perfect, it wouldn't be.", "A nickel ain't worth a dime anymore.",
+  "We made too many wrong mistakes.", "You can't think and hit at the same time.",
+  "Always go to other people's funerals, otherwise they won't come to yours.", "It gets late early out there.",
+  "Half the lies they tell about me aren't true.", "If you can't imitate him, don't copy him.",
+  "Pair up in threes.", "I usually take a two-hour nap from one to four.",
+  "It's tough to make predictions, especially about the future.", "If people don't want to come out to the ballpark, nobody's going to stop them.",
+  "I knew the record would stand until it was broken.", "The towels were so thick there I could hardly close my suitcase.",
+  "Slump? I ain't in no slump. I just ain't hitting.", "You've got to be very careful if you don't know where you are going, because you might not get there."
+];
+let lastQuote = -1;
+function newQuote(){ let i; do { i = Math.floor(Math.random()*YOGI.length); } while (i === lastQuote && YOGI.length > 1); lastQuote = i; $("quote").textContent = "\u201c" + YOGI[i] + "\u201d \u2014 Yogi Berra"; }
 const LABELS = {search:"Keyword query", paper:"Paper title, or an id (Semantic Scholar hash, DOI:10.…, ARXIV:2404.19756)",
   cites:"Title or id of the paper to find citing papers for", refs:"Title or id of the paper to list references of", related:"Title or id of the paper to find similar papers for",
   oa:"DOI, or the paper's title", novelty:"Claim, phrased as a generic topic (never a sentence from the manuscript)", research:"Research question"};
@@ -293,6 +317,7 @@ function renderResult(el, run, result, mode){
 async function run(){
   const m = mode(), text = $("text").value.replace(/\s+/g, " ").trim();
   if (!text) { $("text").focus(); return; }
+  newQuote();
   const body = {mode:m, text, n:$("n").value, year_from:$("year").value, backend:AGENT.has(m)?chosenBackend():"", model:AGENT.has(m)?chosenModel():"", rounds:$("rounds").value, out:$("out").value};
   $("go").disabled = true; $("status").classList.remove("hidden"); $("result").classList.add("hidden");
   $("statusLine").textContent = "Running…"; $("progress").textContent = ""; $("progress").classList.toggle("hidden", !AGENT.has(m));
@@ -335,6 +360,7 @@ function showTab(t){ $("run").classList.toggle("hidden", t!=="run"); $("hist").c
   $("tabRun").classList.toggle("on", t==="run"); $("tabHist").classList.toggle("on", t==="hist"); if (t==="hist") loadHistory(); }
 $("tabRun").addEventListener("click", ()=>showTab("run")); $("tabHist").addEventListener("click", ()=>showTab("hist"));
 loadConfig();
+newQuote();
 </script>
 </body>
 </html>

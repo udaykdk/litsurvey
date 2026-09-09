@@ -102,6 +102,11 @@ to arXiv for use of its open access interoperability) and
 [Unpaywall](https://unpaywall.org). If you publish work that used these
 results, please credit them.
 
+## Author
+
+Uday Khankhoje, Department of Electrical Engineering, IIT Madras.
+Questions and bug reports: the issue tracker on GitHub.
+
 ## Credits
 
 The banner of the web page uses slivers of an aerial beach photograph by
