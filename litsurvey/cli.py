@@ -24,6 +24,8 @@ def _add_agent_opts(p):
                         "ollama (local), openai, anthropic. Default: config, else auto-detect "
                         "(local first)")
     p.add_argument("--model", help="model name; for --backend cli the tool name: claude, codex, gemini or custom")
+    p.add_argument("--base-url", metavar="URL",
+                   help="for --backend openai: the API root, e.g. https://openrouter.ai/api or http://localhost:1234")
     p.add_argument("--rounds", type=int, default=8, help="max tool-calling rounds (default 8)")
     p.add_argument("--out", metavar="FILE", help="save the report as markdown (+ FILE.log.json)")
     p.add_argument("--no-log", action="store_true", help="omit the search-log appendix")
@@ -97,7 +99,7 @@ def cmd_oa(args):
 def cmd_agent_mode(mode):
     def run(args):
         params = {"text": args.text, "backend": args.backend, "model": args.model,
-                  "rounds": args.rounds}
+                  "rounds": args.rounds, "base_url": args.base_url}
         result = ops.run_mode(mode, params)
         print(result["report"])
         run_id, written = ops.save(mode, params, result, out=args.out, with_log=not args.no_log)
@@ -169,6 +171,8 @@ def cmd_init(args):
         if model:
             vals["model"] = model
     if (be or cur["backend"]) == "openai":
+        print("  examples: https://api.openai.com (OpenAI), https://openrouter.ai/api (OpenRouter), "
+              "http://localhost:1234 (LM Studio)")
         base = input(f"OpenAI-compatible base URL [{cur['openai_base_url']}]: ").strip()
         if base:
             vals["openai_base_url"] = base

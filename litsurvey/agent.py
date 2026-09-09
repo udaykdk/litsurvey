@@ -122,12 +122,13 @@ def dispatch(name, args, log):
         return {"error": str(e)}
 
 
-def run(kind, text, backend=None, model=None, rounds=8, progress=None):
-    """Run the agent. Returns {"report", "log", "backend", "model", "rounds_used"}."""
+def run(kind, text, backend=None, model=None, rounds=8, progress=None, options=None):
+    """Run the agent. Returns {"report", "log", "backend", "model", "rounds_used"}.
+    options: e.g. {"base_url": "https://openrouter.ai/api"} for the openai backend."""
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {list(KINDS)}")
     system, user_tmpl, kind_name = KINDS[kind]
-    backend, model = backends.resolve(backend, model)
+    backend, model = backends.resolve(backend, model, options)
     say = progress or (lambda s: print(s, file=sys.stderr))
     if backend == "cli":
         return _run_cli(kind, text, model, rounds, say)
@@ -141,7 +142,7 @@ def run(kind, text, backend=None, model=None, rounds=8, progress=None):
     for step in range(rounds):
         used = step + 1
         say(f"[agent] thinking… (round {used}/{rounds})")
-        reply = backends.chat(backend, model, messages, tools=TOOLS)
+        reply = backends.chat(backend, model, messages, tools=TOOLS, options=options)
         messages.append({"role": "assistant", "content": reply["content"],
                          "tool_calls": reply["tool_calls"]})
         if not reply["tool_calls"]:
@@ -157,7 +158,7 @@ def run(kind, text, backend=None, model=None, rounds=8, progress=None):
         say("[agent] round limit reached, requesting final report")
         messages.append({"role": "user", "content":
                          f"Stop searching. Write the final {kind_name} now, based on everything found so far."})
-        final = backends.chat(backend, model, messages)["content"]
+        final = backends.chat(backend, model, messages, options=options)["content"]
     return {"report": final, "log": log, "backend": backend, "model": model,
             "rounds_used": used}
 

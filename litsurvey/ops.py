@@ -73,9 +73,10 @@ def run_mode(mode, params, progress=None):
     if mode == "oa":
         return {"oa": unpaywall.lookup(text)}
     if mode in AGENT_MODES:
+        options = {"base_url": params["base_url"]} if params.get("base_url") else None
         return agent.run(mode, text, backend=params.get("backend"),
                          model=params.get("model"), rounds=int(params.get("rounds") or 8),
-                         progress=progress)
+                         progress=progress, options=options)
     raise ValueError(f"unknown mode {mode!r}")
 
 

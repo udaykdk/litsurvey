@@ -70,7 +70,7 @@ def test_agent_loop_runs_tools_and_stops(monkeypatch):
                                        {"id": "b", "name": "read_paper", "args": {"arxiv_id": "9"}}]},
         {"content": "## Verdict\nfine", "tool_calls": []},
     ])
-    monkeypatch.setattr(backends, "resolve", lambda b, m: ("ollama", "test-model"))
+    monkeypatch.setattr(backends, "resolve", lambda b, m, o=None: ("ollama", "test-model"))
     monkeypatch.setattr(backends, "chat", lambda *a, **k: next(replies))
     monkeypatch.setattr(agent, "run_search", lambda q, **k: ([], {"openalex": 0, "s2": 0, "arxiv": 0}))
     monkeypatch.setattr(agent.arxiv, "full_text", lambda aid: (_ for _ in ()).throw(RuntimeError("no html")))
@@ -87,13 +87,13 @@ def test_agent_loop_runs_tools_and_stops(monkeypatch):
 def test_agent_round_limit_forces_report(monkeypatch):
     calls = {"n": 0}
 
-    def chat(backend, model, messages, tools=None):
+    def chat(backend, model, messages, tools=None, options=None):
         calls["n"] += 1
         if tools:
             return {"content": "", "tool_calls": [{"id": "a", "name": "search_papers", "args": {"query": "x"}}]}
         assert messages[-1]["role"] == "user" and "Stop searching" in messages[-1]["content"]
         return {"content": "forced report", "tool_calls": []}
-    monkeypatch.setattr(backends, "resolve", lambda b, m: ("ollama", "m"))
+    monkeypatch.setattr(backends, "resolve", lambda b, m, o=None: ("ollama", "m"))
     monkeypatch.setattr(backends, "chat", chat)
     monkeypatch.setattr(agent, "run_search", lambda q, **k: ([], {}))
     res = agent.run("research", "q", rounds=2, progress=lambda s: None)
@@ -147,3 +147,22 @@ def test_cli_backend_errors(monkeypatch):
     monkeypatch.setitem(backends.CFG, "cli_command", f"{sys.executable} -c \"import sys; sys.exit(3)\"")
     with pytest.raises(RuntimeError, match="exited with code 3"):
         backends.run_cli("custom", "hi")
+
+
+def test_openai_base_url_override_and_openrouter_headers(monkeypatch):
+    seen = capture(monkeypatch, {"choices": [{"message": {"content": "hi"}}]})
+    monkeypatch.setitem(backends.CFG, "openai_api_key", "sk-or-x")
+    out = backends.chat("openai", "anthropic/claude-sonnet-4.5", MSGS[:2],
+                        options={"base_url": "https://openrouter.ai/api/"})
+    assert seen["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert seen["headers"]["X-Title"] == "litsurvey" and seen["headers"]["Authorization"] == "Bearer sk-or-x"
+    assert out["content"] == "hi"
+
+
+def test_hosted_openai_requires_a_model(monkeypatch):
+    for k in ("model",):
+        monkeypatch.setitem(backends.CFG, k, "")
+    with pytest.raises(RuntimeError, match="pass --model"):
+        backends.resolve("openai", None, {"base_url": "https://openrouter.ai/api"})
+    monkeypatch.setattr(backends, "openai_models", lambda base=None: ["local-model"])
+    assert backends.resolve("openai", None, {"base_url": "http://localhost:1234"}) == ("openai", "local-model")

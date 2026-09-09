@@ -88,6 +88,7 @@ class Handler(BaseHTTPRequestHandler):
                     info["ollama"] = True
                 except Exception:  # noqa: BLE001
                     pass
+                info["openai_base_url"] = cfg["openai_base_url"]
                 info["cli_tools"] = backends.cli_tools_available() + (["custom"] if cfg["cli_command"] else [])
                 info["cli_tool"] = cfg["cli_tool"]
                 info["openai_key"] = bool(cfg["openai_api_key"])
@@ -135,7 +136,7 @@ class Handler(BaseHTTPRequestHandler):
             mode = body.get("mode")
             if mode not in ops.MODES:
                 return self._json({"error": f"unknown mode {mode!r}"}, 400)
-            params = {k: body.get(k) for k in ("text", "n", "year_from", "backend", "model", "rounds", "pick")}
+            params = {k: body.get(k) for k in ("text", "n", "year_from", "backend", "model", "rounds", "pick", "base_url")}
             params = {k: v for k, v in params.items() if v not in (None, "", [])}
             if "n" in params:
                 params["n"] = int(params["n"])

@@ -123,7 +123,29 @@ litsurvey novelty "..." --backend openai --model <name shown by the server>
 
 ### Option 3: cloud API keys
 
-`--backend openai` with the default base URL, or `--backend anthropic`. Your
+`--backend openai` with the default base URL, or `--backend anthropic`.
+
+**OpenRouter** (one key, many models) works through the `openai` backend,
+because it speaks the OpenAI chat API. Set the base URL to
+`https://openrouter.ai/api` (litsurvey appends `/v1/...`), put the key in
+`OPENAI_API_KEY` or the config's `openai_api_key`, and name the model in
+OpenRouter's `provider/model` form:
+
+```bash
+export OPENAI_API_KEY=sk-or-...
+litsurvey novelty "..." --backend openai --base-url https://openrouter.ai/api --model anthropic/claude-sonnet-4.5
+litsurvey research "..." --backend openai --base-url https://openrouter.ai/api --model qwen/qwen3-235b-a22b
+```
+
+Or store it once with `litsurvey init` (backend `openai`, base URL
+`https://openrouter.ai/api`, the key, and a default model). On the web page,
+choose *Cloud API key*, provider *openai-compatible*, and the base URL and
+model boxes appear. A hosted API needs an explicit model name; only local
+servers (`localhost`) get the "first loaded model" default. Pick a model that
+supports tool calling (OpenRouter's model pages list "tools" under supported
+parameters); without it the agent cannot search.
+
+Your
 input text and every search result are sent to the provider. Do not use for
 material you must keep confidential; see
 [confidentiality.md](confidentiality.md).

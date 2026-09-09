@@ -110,6 +110,7 @@
         <label id="optYear">From year<input type="number" id="year" placeholder="any" style="width:90px"></label>
         <label id="optTool">CLI tool<select id="clitool"></select></label>
         <label id="optBackend">Provider<select id="backend"><option value="openai">openai-compatible</option><option value="anthropic">anthropic</option></select></label>
+        <label id="optBase">API base URL<input type="text" id="baseurl" list="bases" placeholder="https://api.openai.com" style="width:230px"><datalist id="bases"><option value="https://api.openai.com"><option value="https://openrouter.ai/api"><option value="http://localhost:1234"></datalist></label>
         <label id="optModel">Model<input type="text" id="model" list="models" placeholder="default" style="width:200px"><datalist id="models"></datalist></label>
         <label id="optRounds">Max rounds<input type="number" id="rounds" value="8" min="1" max="30" style="width:70px"></label>
         <label style="flex:1">Output file (optional; extension picks format: .bib .ris .csv .json .md)<input type="text" id="out" placeholder="/absolute/path/results.bib"></label>
@@ -179,10 +180,12 @@ function refreshForm(){
   const choice = llmChoice();
   $("optTool").classList.toggle("hidden", !isAgent || choice!=="cli");
   $("optBackend").classList.toggle("hidden", !isAgent || choice!=="cloud");
+  $("optBase").classList.toggle("hidden", !isAgent || choice!=="cloud" || $("backend").value!=="openai");
   $("optModel").classList.toggle("hidden", !isAgent || choice==="cli");
   $("optRounds").classList.toggle("hidden", !isAgent);
   if (!$("rounds").dataset.touched) $("rounds").value = m==="research" ? 12 : 8;
-  $("model").placeholder = llmLocal() ? ((CONFIG.ollama_models||[])[0] || "e.g. qwen3:30b") : ($("backend").value==="anthropic" ? "e.g. claude-sonnet-5" : "e.g. gpt-5");
+  const isOR = /openrouter/i.test($("baseurl").value);
+  $("model").placeholder = llmLocal() ? ((CONFIG.ollama_models||[])[0] || "e.g. qwen3:30b") : ($("backend").value==="anthropic" ? "e.g. claude-sonnet-5" : (isOR ? "required, e.g. anthropic/claude-sonnet-4.5" : "e.g. gpt-5"));
   const p = $("privacy");
   if (!isAgent) { p.className="note ok"; p.textContent = m==="oa" ? "No LLM involved. Only the DOI is sent to Unpaywall." : "No LLM involved. Only this query or ID is sent to the scholarly APIs (OpenAlex, Semantic Scholar, arXiv)."; checkUrl(); return; }
   if (choice === "cli") {
@@ -215,6 +218,7 @@ document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener("cha
 document.querySelectorAll('input[name=llmloc]').forEach(r=>r.addEventListener("change", ()=>{ try { localStorage.setItem("litsurvey.llmloc", llmChoice()); } catch(e){} refreshForm(); }));
 $("backend").addEventListener("change", refreshForm);
 $("clitool").addEventListener("change", refreshForm);
+$("baseurl").addEventListener("input", refreshForm);
 $("rounds").addEventListener("input", ()=>{ $("rounds").dataset.touched = "1"; });
 $("text").addEventListener("input", checkUrl);
 
@@ -230,6 +234,7 @@ async function loadConfig(){
   if (!choice || !avail[choice]) choice = (CONFIG.cli_tools||[]).length ? "cli" : (CONFIG.ollama ? "local" : ((CONFIG.openai_key||CONFIG.anthropic_key) ? "cloud" : "local"));
   document.querySelector(`input[name=llmloc][value=${choice}]`).checked = true;
   if (CONFIG.backend === "anthropic" || CONFIG.backend === "openai") $("backend").value = CONFIG.backend;
+  if (CONFIG.openai_base_url) $("baseurl").value = CONFIG.openai_base_url;
   if (CONFIG.issues_url) $("bugLink").href = CONFIG.issues_url + "&title=" + encodeURIComponent("[web] ") + "&body=" + encodeURIComponent(`litsurvey ${CONFIG.version} web interface\n\n**What happened**\n\n**Mode and input**\n\n**Output of litsurvey doctor**\n`);
   if (CONFIG.repo_url) $("docsLink").href = CONFIG.repo_url + "#documentation";
   refreshForm();
@@ -318,7 +323,7 @@ async function run(){
   const m = mode(), text = $("text").value.replace(/\s+/g, " ").trim();
   if (!text) { $("text").focus(); return; }
   newQuote();
-  const body = {mode:m, text, n:$("n").value, year_from:$("year").value, backend:AGENT.has(m)?chosenBackend():"", model:AGENT.has(m)?chosenModel():"", rounds:$("rounds").value, out:$("out").value};
+  const body = {mode:m, text, n:$("n").value, year_from:$("year").value, backend:AGENT.has(m)?chosenBackend():"", model:AGENT.has(m)?chosenModel():"", rounds:$("rounds").value, out:$("out").value, base_url:(AGENT.has(m)&&chosenBackend()==="openai")?$("baseurl").value.trim():""};
   $("go").disabled = true; $("status").classList.remove("hidden"); $("result").classList.add("hidden");
   $("statusLine").textContent = "Running…"; $("progress").textContent = ""; $("progress").classList.toggle("hidden", !AGENT.has(m));
   let job;

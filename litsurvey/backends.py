@@ -89,7 +89,7 @@ def openai_models(base=None):
     return [m["id"] for m in data.get("data", [])]
 
 
-def resolve(backend=None, model=None):
+def resolve(backend=None, model=None, options=None):
     """Pick (backend, model) from arguments, config, then auto-detection."""
     backend = (backend or CFG["backend"] or "auto").lower()
     if backend == "auto":
@@ -128,10 +128,16 @@ def resolve(backend=None, model=None):
             print(f"[agent] no model configured, using Ollama model {model!r}",
                   file=sys.stderr)
         elif backend == "openai":
-            try:
-                model = openai_models()[0]
-            except Exception as e:  # noqa: BLE001
-                raise RuntimeError(f"pass --model for the openai backend ({e})") from None
+            base = (options or {}).get("base_url") or CFG["openai_base_url"]
+            if "localhost" in base or "127.0.0.1" in base:
+                try:                      # a local server usually has one loaded model
+                    model = openai_models(base)[0]
+                except Exception as e:  # noqa: BLE001
+                    raise RuntimeError(f"pass --model for the openai backend ({e})") from None
+            else:
+                raise RuntimeError("pass --model for a hosted OpenAI-compatible API, e.g. "
+                                   "--model gpt-5 (OpenAI) or --model anthropic/claude-sonnet-4.5 "
+                                   "(OpenRouter); see docs/llm-integration.md")
         else:
             model = "claude-sonnet-5"
     return backend, model
@@ -139,11 +145,12 @@ def resolve(backend=None, model=None):
 
 # ------------------------------------------------------------- chat
 
-def chat(backend, model, messages, tools=None):
+def chat(backend, model, messages, tools=None, options=None):
+    """options (optional): {"base_url": ..., "api_key": ...} overrides for the openai backend."""
     if backend == "ollama":
         return _chat_ollama(model, messages, tools)
     if backend == "openai":
-        return _chat_openai(model, messages, tools)
+        return _chat_openai(model, messages, tools, options or {})
     if backend == "anthropic":
         return _chat_anthropic(model, messages, tools)
     raise RuntimeError(f"unknown backend {backend!r}")
@@ -180,7 +187,10 @@ def _chat_ollama(model, messages, tools):
     return {"content": msg.get("content") or "", "tool_calls": calls}
 
 
-def _chat_openai(model, messages, tools):
+def _chat_openai(model, messages, tools, options=None):
+    options = options or {}
+    base = (options.get("base_url") or CFG["openai_base_url"]).rstrip("/")
+    api_key = options.get("api_key") or CFG["openai_api_key"]
     conv = []
     for m in messages:
         if m["role"] == "assistant":
@@ -200,9 +210,12 @@ def _chat_openai(model, messages, tools):
     if tools:
         payload["tools"] = [{"type": "function", "function": t} for t in tools]
     hdrs = {}
-    if CFG["openai_api_key"]:
-        hdrs["Authorization"] = "Bearer " + CFG["openai_api_key"]
-    resp = http.post_json(CFG["openai_base_url"] + "/v1/chat/completions", payload, headers=hdrs)
+    if api_key:
+        hdrs["Authorization"] = "Bearer " + api_key
+    if "openrouter.ai" in base:            # optional attribution headers OpenRouter asks for
+        hdrs["HTTP-Referer"] = "https://github.com/udaykdk/litsurvey"
+        hdrs["X-Title"] = "litsurvey"
+    resp = http.post_json(base + "/v1/chat/completions", payload, headers=hdrs)
     msg = (resp.get("choices") or [{}])[0].get("message") or {}
     calls = [{"id": c.get("id") or uuid.uuid4().hex[:12], "name": c["function"]["name"],
               "args": _parse_args(c["function"].get("arguments"))}
