@@ -9,7 +9,7 @@ import uuid
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import __version__, backends, config, export, history, ops, papers
+from . import __version__, backends, config, export, history, http, ops, papers
 
 REPO_URL = "https://github.com/udaykdk/litsurvey"
 
@@ -27,14 +27,21 @@ def _start_job(mode, params, out):
     job_id = uuid.uuid4().hex[:10]
     job = {"id": job_id, "mode": mode, "status": "running", "progress": [],
            "started": time.time(), "result": None, "run_id": None, "error": None,
-           "written": []}
+           "written": [], "current": ""}
     with JOBS_LOCK:
         JOBS[job_id] = job
 
     def progress(line):
         job["progress"].append(line)
 
+    def reporter(kind, text):
+        if kind == "current":
+            job["current"] = text
+        else:
+            job["progress"].append("[wait] " + text)
+
     def work():
+        http.set_reporter(reporter)
         try:
             result = ops.run_mode(mode, params, progress=progress)
             run_id, written = ops.save(mode, params, result, out=out)

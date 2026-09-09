@@ -93,3 +93,29 @@ def test_merge_weights_keep_niche_portals_below_major_indexes():
     niche = [mk(title="Niche", doi="10/n")]
     merged = P.merge([(major, 1.0), (niche, 0.5)])
     assert [p["title"] for p in merged] == ["Major", "Niche"]
+
+
+def test_http_reporter_receives_current_host_and_retry_notes(monkeypatch):
+    import urllib.error
+    from litsurvey import http
+    events = []
+    http.set_reporter(lambda kind, text: events.append((kind, text)))
+    monkeypatch.setattr(http.time, "sleep", lambda s: None)
+    calls = {"n": 0}
+
+    class Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def read(self): return b"ok"
+
+    def urlopen(req, timeout=30):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise urllib.error.HTTPError(req.full_url, 429, "rate", {}, None)
+        return Resp()
+    monkeypatch.setattr(http.urllib.request, "urlopen", urlopen)
+    assert http.get("https://api.semanticscholar.org/x") == b"ok"
+    assert ("current", "Semantic Scholar") in events and ("current", "") in events
+    assert any(k == "note" and "rate-limiting" in t for k, t in events)
+    http.set_reporter(None)
+    assert http.friendly("localhost:11434") == "the local model" and http.friendly("x.y") == "x.y"

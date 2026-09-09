@@ -67,11 +67,12 @@
   footer { max-width:1100px; margin:0 auto; padding:10px 22px 26px; color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; border-top:1px solid var(--line); }
   footer .flag { width:16px; height:11px; vertical-align:-1px; margin-right:6px; border:1px solid #ddd; }
   footer .quote { font-style:italic; margin-left:auto; text-align:right; }
+  button.small.tiny { font-size:11px; padding:2px 7px; margin-left:6px; font-style:normal; color:var(--muted); }
 </style>
 </head>
 <body>
 <header>
-  <span class="brand"><h1>litsurvey</h1><span class="v">v{{VERSION}} · local literature search</span></span>
+  <span class="brand"><h1>litsurvey</h1><span class="v">v{{VERSION}} · Scientific Literature Survey</span></span>
   <nav><button id="tabRun" class="on">Run</button><button id="tabHist">History</button></nav>
   <span class="links"><a id="docsLink" href="#" target="_blank" rel="noopener">Docs</a><a id="bugLink" href="#" target="_blank" rel="noopener">Report a bug</a></span>
 </header>
@@ -134,8 +135,8 @@
 </section>
 </main>
 <footer>
-  <span><svg class="flag" viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg" aria-label="India"><rect width="30" height="20" fill="#f93"/><rect y="6.67" width="30" height="6.67" fill="#fff"/><rect y="13.33" width="30" height="6.67" fill="#128807"/><circle cx="15" cy="10" r="2.6" fill="none" stroke="#008" stroke-width=".7"/><circle cx="15" cy="10" r=".5" fill="#008"/></svg>Uday Khankhoje (IIT Madras)</span>
-  <span class="quote" id="quote"></span>
+  <span><svg class="flag" viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg" aria-label="India"><rect width="30" height="20" fill="#f93"/><rect y="6.67" width="30" height="6.67" fill="#fff"/><rect y="13.33" width="30" height="6.67" fill="#128807"/><circle cx="15" cy="10" r="2.6" fill="none" stroke="#008" stroke-width=".7"/><circle cx="15" cy="10" r=".5" fill="#008"/></svg>Designed by Uday Khankhoje (IIT Madras), implemented by Anthropic Claude</span>
+  <span class="quote"><span id="quote"></span> <button class="small tiny" id="another" title="another Yogi Berra quote">another?</button></span>
 </footer>
 <script>
 const $ = id => document.getElementById(id);
@@ -334,8 +335,13 @@ async function run(){
   const poll = async ()=>{
     const j = await (await fetch("/api/jobs/"+job.job_id)).json();
     $("progress").textContent = (j.progress||[]).join("\n"); $("progress").scrollTop = 1e9;
+    $("progress").classList.toggle("hidden", !(AGENT.has(m) || (j.progress||[]).length));
     const secs = Math.round((Date.now()-t0)/1000);
-    if (j.status==="running"){ $("statusLine").textContent = `Running… ${secs}s`; setTimeout(poll, AGENT.has(m)?1500:500); return; }
+    if (j.status==="running"){
+      const cur = j.current ? ` · waiting for ${j.current}` : "";
+      const hint = secs >= 15 ? " · a source is answering slowly; this page updates by itself, no need to reload" : "";
+      $("statusLine").textContent = `Running… ${secs}s${cur}${hint}`;
+      setTimeout(poll, AGENT.has(m)?1500:700); return; }
     $("go").disabled = false;
     if (j.status==="error"){ $("statusLine").textContent = "Failed: "+j.error; return; }
     if (j.result && j.result.needs_choice) { $("statusLine").textContent = `Found ${j.result.candidates.length} candidates in ${secs}s`; renderCandidates($("result"), j.result, m); return; }
@@ -345,6 +351,7 @@ async function run(){
   poll();
 }
 $("go").addEventListener("click", run);
+$("another").addEventListener("click", newQuote);
 $("text").addEventListener("keydown", e=>{ if ((e.metaKey||e.ctrlKey) && e.key==="Enter") run(); });
 
 async function loadHistory(){
