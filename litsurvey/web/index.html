@@ -29,6 +29,7 @@
   .module .grp { margin-top:0; }
   .llmloc { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border:1px solid #c3d9ee; border-radius:6px; background:rgba(255,255,255,.7); transition:opacity .15s; }
   .llmloc > label { flex:1 1 220px; }
+  .llmloc .llmopts { flex-basis:100%; margin-top:4px; padding-top:8px; border-top:1px dashed #c3d9ee; }
   .llmloc.off { opacity:.4; pointer-events:none; }
   .llmloc label { display:flex; gap:8px; align-items:flex-start; cursor:pointer; } .llmloc small { display:block; color:var(--muted); }
   .llmloc .grp2 { flex-basis:100%; font-size:13px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
@@ -102,6 +103,13 @@
         <label><input type="radio" name="llmloc" value="cli" disabled><span>Subscription CLI<small>Claude Code, Codex or Gemini CLI, signed in with your Claude Pro, ChatGPT or Google plan. Your text goes to that vendor.</small></span></label>
         <label><input type="radio" name="llmloc" value="local" checked disabled><span>Local model<small>Ollama on this machine. Nothing leaves it.</small></span></label>
         <label><input type="radio" name="llmloc" value="cloud" disabled><span>Cloud API key<small>OpenAI-compatible or Anthropic API. Your text goes to the provider.</small></span></label>
+        <div class="row llmopts">
+          <label id="optTool">CLI tool<select id="clitool"></select></label>
+          <label id="optBackend">Provider<select id="backend"><option value="openai">openai-compatible</option><option value="anthropic">anthropic</option></select></label>
+          <label id="optBase">API base URL<input type="text" id="baseurl" list="bases" placeholder="https://api.openai.com" style="width:230px"><datalist id="bases"><option value="https://api.openai.com"><option value="https://openrouter.ai/api"><option value="http://localhost:1234"></datalist></label>
+          <label id="optModel">Model<input type="text" id="model" list="models" placeholder="default" style="width:200px"><datalist id="models"></datalist></label>
+          <label id="optRounds">Max rounds<input type="number" id="rounds" value="8" min="1" max="30" style="width:70px"></label>
+        </div>
       </div>
       </div>
       <div class="row" style="margin-top:14px"><label style="flex:1"><span id="inLabel">Keyword query</span><textarea id="text" placeholder="e.g. physics informed neural networks inverse problems"></textarea></label></div>
@@ -109,11 +117,6 @@
       <div class="row">
         <label id="optN">Max results<input type="number" id="n" value="15" min="1" max="100" style="width:80px"></label>
         <label id="optYear">From year<input type="number" id="year" placeholder="any" style="width:90px"></label>
-        <label id="optTool">CLI tool<select id="clitool"></select></label>
-        <label id="optBackend">Provider<select id="backend"><option value="openai">openai-compatible</option><option value="anthropic">anthropic</option></select></label>
-        <label id="optBase">API base URL<input type="text" id="baseurl" list="bases" placeholder="https://api.openai.com" style="width:230px"><datalist id="bases"><option value="https://api.openai.com"><option value="https://openrouter.ai/api"><option value="http://localhost:1234"></datalist></label>
-        <label id="optModel">Model<input type="text" id="model" list="models" placeholder="default" style="width:200px"><datalist id="models"></datalist></label>
-        <label id="optRounds">Max rounds<input type="number" id="rounds" value="8" min="1" max="30" style="width:70px"></label>
         <label style="flex:1">Output file (optional; extension picks format: .bib .ris .csv .json .md)<input type="text" id="out" placeholder="/absolute/path/results.bib"></label>
         <button class="primary" id="go">Run</button>
       </div>
@@ -177,13 +180,12 @@ function refreshForm(){
   $("optN").classList.toggle("hidden", isAgent || m==="oa" || m==="paper");
   $("optYear").classList.toggle("hidden", m!=="search");
   $("llmloc").classList.toggle("off", !isAgent);
-  document.querySelectorAll('input[name=llmloc]').forEach(r=>{ r.disabled = !isAgent; });
+  document.querySelectorAll('#llmloc input, #llmloc select').forEach(el=>{ el.disabled = !isAgent; });
   const choice = llmChoice();
-  $("optTool").classList.toggle("hidden", !isAgent || choice!=="cli");
-  $("optBackend").classList.toggle("hidden", !isAgent || choice!=="cloud");
-  $("optBase").classList.toggle("hidden", !isAgent || choice!=="cloud" || $("backend").value!=="openai");
-  $("optModel").classList.toggle("hidden", !isAgent || choice==="cli");
-  $("optRounds").classList.toggle("hidden", !isAgent);
+  $("optTool").classList.toggle("hidden", choice!=="cli");
+  $("optBackend").classList.toggle("hidden", choice!=="cloud");
+  $("optBase").classList.toggle("hidden", choice!=="cloud" || $("backend").value!=="openai");
+  $("optModel").classList.toggle("hidden", choice==="cli");
   if (!$("rounds").dataset.touched) $("rounds").value = m==="research" ? 12 : 8;
   const isOR = /openrouter/i.test($("baseurl").value);
   $("model").placeholder = llmLocal() ? ((CONFIG.ollama_models||[])[0] || "e.g. qwen3:30b") : ($("backend").value==="anthropic" ? "e.g. claude-sonnet-5" : (isOR ? "required, e.g. anthropic/claude-sonnet-4.5" : "e.g. gpt-5"));
