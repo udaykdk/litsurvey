@@ -100,12 +100,18 @@ def related_papers(pid, n, sort, progress=None):
     as the fallback when it fails and the paper has a DOI."""
     say = _say(progress)
     try:
-        return sort_papers(semanticscholar.related(pid, limit=n), sort)
+        out = semanticscholar.related(pid, limit=n)
+        if out:
+            return sort_papers(out, sort)
+        reason = "returned nothing"
     except Exception as e:  # noqa: BLE001
-        if not pid.upper().startswith("DOI:"):
-            raise RuntimeError(f"Semantic Scholar recommendations failed ({e}) and this id has no DOI "
-                               f"for the OpenAlex fallback; try again in a minute or use the DOI") from None
-        say(f"[warn] Semantic Scholar recommendations failed ({e}); using OpenAlex related works")
+        reason = f"failed ({e})"
+    if not pid.upper().startswith("DOI:"):
+        if reason == "returned nothing":
+            return []
+        raise RuntimeError(f"Semantic Scholar recommendations {reason} and this id has no DOI "
+                           f"for the OpenAlex fallback; try again in a minute or use the DOI")
+    say(f"[warn] Semantic Scholar recommendations {reason}; using OpenAlex related works")
     work = openalex.work_by_doi(pid[4:])
     return openalex.related(work, limit=n, sort=sort if sort != "relevance" else "citations")
 

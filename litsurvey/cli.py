@@ -212,7 +212,10 @@ def cmd_doctor(args):
             if name == "iacr" and not r:
                 print("               (0 results: IACR's search page may have changed; other sources unaffected)")
         except Exception as e:  # noqa: BLE001
-            if name in ("openalex", "semanticscholar", "arxiv"):
+            if name == "semanticscholar" and not cfg["s2_api_key"]:
+                warnings.append("semanticscholar (no API key; the shared pool is refusing, "
+                                "get a free key: docs/api-keys.md)")
+            elif name in ("openalex", "semanticscholar", "arxiv"):
                 ok = False
             else:
                 warnings.append(name)

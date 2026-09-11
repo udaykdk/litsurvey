@@ -55,10 +55,14 @@ Never paste the key into an issue report; `--debug` output does not print it.
 
 With a key, searches return in a few seconds and the citation-graph and
 recommendation commands are reliable. Without a key, Semantic Scholar's
-shared pool often answers 429; litsurvey waits and retries (2, 4, 8, 16
-seconds), so a search may take half a minute at busy times, and a long agent
-run will be slow. OpenAlex and arXiv are unaffected, so `search` still
-returns results even when Semantic Scholar is refusing.
+shared pool often answers 429 and at busy times refuses every request;
+litsurvey retries once and moves on, so a keyless search takes about ten
+seconds and still returns results from the other five sources. `cites`,
+`refs`, `related` and `paper` fall back to OpenAlex for any paper with a
+DOI, so they keep working too; only ids without a DOI depend on Semantic
+Scholar alone. `doctor` reports a keyless Semantic Scholar failure as a
+warning, not a problem. Agent runs (`novelty`, `research`) are noticeably
+slower and thinner without the key.
 
 ## Other keys
 

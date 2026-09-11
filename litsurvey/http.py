@@ -98,8 +98,12 @@ def _retry_after(err, attempt):
 
 
 def get(url, headers=None, timeout=30, retries=5):
-    """GET url and return the raw bytes. Retries 429/5xx and network errors."""
+    """GET url and return the raw bytes. Retries 429/5xx and network errors.
+    Without a Semantic Scholar key the shared pool often refuses outright, so
+    retries there are capped at two to keep keyless searches quick."""
     host = urllib.parse.urlparse(url).netloc
+    if host == "api.semanticscholar.org" and not (headers or {}).get("x-api-key"):
+        retries = min(retries, 2)
     hdrs = {"User-Agent": USER_AGENT}
     hdrs.update(headers or {})
     last = None

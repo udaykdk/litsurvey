@@ -100,8 +100,13 @@ def references(work, limit=20, sort="citations"):
 
 
 def related(work, limit=20, sort="citations"):
-    """OpenAlex's related_works for a work record (fallback for Semantic Scholar's recommender)."""
-    return _sorted(works_by_ids(work.get("related_works") or []), sort, limit)
+    """OpenAlex's related_works for a work record (fallback for Semantic Scholar's
+    recommender). The record itself is dropped if OpenAlex lists it."""
+    own = (work.get("id") or "").rsplit("/", 1)[-1]
+    ids = [r for r in (work.get("related_works") or []) if r.rsplit("/", 1)[-1] != own]
+    self_doi = (work.get("doi") or "").replace("https://doi.org/", "").lower()
+    out = [p for p in works_by_ids(ids) if not (self_doi and p["doi"].lower() == self_doi)]
+    return _sorted(out, sort, limit)
 
 
 def paper_by_doi(doi):
