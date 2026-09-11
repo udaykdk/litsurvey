@@ -42,18 +42,12 @@ newer.
 
 ## Install
 
-From GitHub (works today):
-
 ```bash
-pipx install git+https://github.com/udaykdk/litsurvey
+pipx install litsurvey          # recommended: isolated install, gives the `litsurvey` command
 # or
+pip install litsurvey
+# or the latest development version straight from GitHub
 pip install git+https://github.com/udaykdk/litsurvey
-```
-
-From PyPI, after the first release is published:
-
-```bash
-pipx install litsurvey
 ```
 
 Or clone and run without installing: `python3 -m litsurvey --help`.
