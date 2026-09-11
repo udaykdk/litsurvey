@@ -8,6 +8,8 @@ whether that is a Claude, ChatGPT or Gemini subscription, a local model, or
 an API key. One Python package, no runtime dependencies, Python 3.10 or
 newer.
 
+![litsurvey web interface](https://raw.githubusercontent.com/udaykdk/litsurvey/main/docs/images/web-screenshot.png)
+
 ## What it does
 
 **LLM-driven (the main draw)**

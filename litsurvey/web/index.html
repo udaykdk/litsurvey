@@ -85,7 +85,7 @@
       <div class="module search">
       <div class="grp">Search &amp; lookup (no LLM involved)</div>
       <div class="modes">
-        <label><input type="radio" name="mode" value="search" checked><span>Search<small>keyword search across OpenAlex, Semantic Scholar, arXiv</small></span></label>
+        <label><input type="radio" name="mode" value="search" checked><span>Search<small>keyword search across six indexes (OpenAlex, Semantic Scholar, arXiv, preprint portals)</small></span></label>
         <label><input type="radio" name="mode" value="paper"><span>Paper<small>one paper's full record: abstract, DOI, ids, BibTeX</small></span></label>
         <label><input type="radio" name="mode" value="cites"><span>Cites<small>papers that cite a given paper</small></span></label>
         <label><input type="radio" name="mode" value="refs"><span>Refs<small>papers a given paper cites</small></span></label>
@@ -382,6 +382,8 @@ function showTab(t){ $("run").classList.toggle("hidden", t!=="run"); $("hist").c
 $("tabRun").addEventListener("click", ()=>showTab("run")); $("tabHist").addEventListener("click", ()=>showTab("hist"));
 loadConfig();
 newQuote();
+// ?mode=research&text=... preselects a mode and fills the box (handy for links and screenshots)
+try { const u = new URLSearchParams(location.search); const pm = u.get("mode"); if (pm && LABELS[pm]) { document.querySelector(`input[name=mode][value=${pm}]`).checked = true; refreshForm(); } if (u.get("text")) { $("text").value = u.get("text"); checkUrl(); } } catch(e) {}
 </script>
 </body>
 </html>
