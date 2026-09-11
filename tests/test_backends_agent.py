@@ -176,3 +176,11 @@ def test_is_local_recognises_loopback_openai(monkeypatch):
     assert not backends.is_local("anthropic") and not backends.is_local("cli")
     monkeypatch.setitem(backends.CFG, "openai_base_url", "http://localhost:1234")
     assert backends.is_local("openai")
+
+
+def test_split_command_keeps_windows_paths(monkeypatch):
+    monkeypatch.setattr(backends.os, "name", "nt")
+    assert backends.split_command(r'C:\Python\python.exe -c "import sys; sys.exit(3)" {prompt}') == \
+        [r"C:\Python\python.exe", "-c", "import sys; sys.exit(3)", "{prompt}"]
+    monkeypatch.setattr(backends.os, "name", "posix")
+    assert backends.split_command('/usr/bin/python3 -c "import sys"') == ["/usr/bin/python3", "-c", "import sys"]

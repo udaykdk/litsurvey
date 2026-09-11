@@ -46,6 +46,19 @@ CLI_TOOLS = {
 }
 
 
+def split_command(cmd):
+    """Split a command line into argv. On Windows, POSIX splitting would strip
+    the backslashes from paths, so split in non-POSIX mode and unquote tokens."""
+    if os.name != "nt":
+        return shlex.split(cmd)
+    out = []
+    for tok in shlex.split(cmd, posix=False):
+        if len(tok) >= 2 and tok[0] == tok[-1] and tok[0] in "\"'":
+            tok = tok[1:-1]
+        out.append(tok)
+    return out
+
+
 def cli_tools_available():
     return [t for t in CLI_TOOLS if shutil.which(t)]
 
@@ -55,7 +68,7 @@ def cli_command(tool):
     if tool == "custom":
         if not CFG["cli_command"]:
             raise RuntimeError("cli_tool=custom needs cli_command in the config")
-        argv = shlex.split(CFG["cli_command"])
+        argv = split_command(CFG["cli_command"])
         return argv, not any("{prompt}" in a for a in argv)
     if tool not in CLI_TOOLS:
         raise RuntimeError(f"unknown CLI tool {tool!r}; use one of {list(CLI_TOOLS)} or custom")
