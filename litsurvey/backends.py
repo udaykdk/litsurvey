@@ -22,6 +22,17 @@ from .config import CFG
 BACKENDS = ("cli", "ollama", "openai", "anthropic")
 LOCAL_BACKENDS = ("ollama",)   # data never leaves the machine
 
+
+def is_local(backend, base_url=None):
+    """True when the model runs on this machine: Ollama, or an OpenAI-compatible
+    server on a loopback address (LM Studio, vLLM, llama.cpp)."""
+    if backend in LOCAL_BACKENDS:
+        return True
+    if backend == "openai":
+        base = (base_url or CFG["openai_base_url"]).lower()
+        return any(h in base for h in ("localhost", "127.0.0.1", "[::1]", "0.0.0.0"))
+    return False
+
 # Subscription command-line agents. Each is run non-interactively with the task as
 # its prompt; it uses the `litsurvey` command itself as its search tool.
 CLI_TOOLS = {

@@ -36,8 +36,8 @@ add a fixture for the new response shape in `tests/test_sources.py`.
   isolated so that a markup change only silences that source.
 - **Nothing leaves the machine that the docs do not say leaves.** Any change
   to what is sent where must be reflected in `docs/confidentiality.md`.
-- **Every run is recorded** in the history store, with per-source hit
-  counts, so results are reproducible.
+- **Every successfully completed run is recorded** in the history store
+  (search runs with per-source hit counts), so results are reproducible.
 
 ## Adding a source
 

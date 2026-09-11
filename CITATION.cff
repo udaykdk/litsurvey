@@ -6,7 +6,7 @@ message: >-
 type: software
 authors:
   - family-names: Khankhoje
-    given-names: Uday K
+    given-names: Uday
     email: uday@ee.iitm.ac.in
     affiliation: >-
       Department of Electrical Engineering, Indian Institute of Technology
@@ -14,12 +14,15 @@ authors:
     orcid: 'https://orcid.org/0000-0002-9629-3922'
 repository-code: 'https://github.com/udaykdk/litsurvey'
 abstract: >-
-  A zero-dependency Python tool that searches OpenAlex, Semantic Scholar and
-  arXiv, fuses and de-duplicates the results, walks the citation graph, finds
-  open-access copies, and exports BibTeX/RIS/CSV. Optionally, a local or
-  cloud LLM drives multi-step novelty assessment and state-of-the-art
-  surveys, with a reproducible search log. Designed so that confidential
-  manuscript content never has to leave the user's machine.
+  A zero-dependency Python tool for literature surveys: it searches OpenAlex,
+  Semantic Scholar, arXiv, TechRxiv, Research Square and the IACR ePrint
+  archive, fuses and de-duplicates the results, walks the citation graph,
+  finds open-access copies, and exports BibTeX/RIS/CSV. An LLM (a local
+  model, the user's Claude Code / Codex / Gemini subscription CLI, or a cloud
+  API) drives multi-step novelty assessment and cited state-of-the-art
+  surveys, with a reproducible search log. A local browser interface with
+  run history is included. Designed so that confidential manuscript content
+  never has to leave the user's machine.
 keywords:
   - literature search
   - peer review
@@ -32,4 +35,4 @@ keywords:
   - large language models
 license: MIT
 version: 1.0.0
-date-released: '2026-09-07'
+date-released: '2026-09-11'

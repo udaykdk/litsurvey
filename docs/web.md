@@ -9,8 +9,9 @@ opens the page in your default browser. Nothing is served to the network;
 only programs on your computer can reach it. Stop it with Ctrl-C in the
 terminal.
 
-The page does everything the command line does, for people who prefer
-forms to flags.
+The page covers the main search, lookup, agent and history operations, for
+people who prefer forms to flags. A few options stay command-line only:
+`--sources`, `--scholar`, `--debug`, `init` and `doctor`.
 
 ## The Run tab
 
@@ -25,9 +26,10 @@ forms to flags.
    box is greyed out until Novelty or Research is selected, and the page
    remembers your last choice. The model box offers the Ollama models it
    can see.
-4. **Output file.** Optional. An absolute path; the extension picks the
-   format (`.bib`, `.ris`, `.csv`, `.json`, `.md`). Agent reports are always
-   Markdown and get a `.log.json` beside them.
+4. **Output file.** Optional. An absolute path. For paper lists the
+   extension picks the format (`.bib`, `.ris`, `.csv`, `.json`, `.md`);
+   agent reports are always Markdown, with a `.log.json` beside them; an
+   open-access lookup is always written as JSON.
 5. **The privacy banner.** Before you press Run, a green or orange banner
    says what will leave the machine for this mode and backend. Orange means
    a cloud backend will receive your text.
@@ -48,7 +50,7 @@ opens the same query in Google Scholar for comparison.
 
 ## The History tab
 
-Every run, from the page or the command line, is listed with time, mode,
+Every completed run, from the page or the command line, is listed with time, mode,
 input and result count. Click a row to see it again, with the same download
 buttons. The delete button removes a run from the store.
 

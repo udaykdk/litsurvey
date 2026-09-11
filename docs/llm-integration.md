@@ -14,8 +14,11 @@ Three ways to supply the model, in the order most people will have them:
 | Option | Backend name | Runs where | Setup |
 |---|---|---|---|
 | 1. The command-line agent of a subscription you already pay for: Claude Code (Claude Pro / Max), Codex CLI (ChatGPT), Gemini CLI (Google) | `cli` | the vendor's servers | install the tool, sign in once in a terminal |
-| 2. A local model | `ollama` | your machine | install Ollama, `ollama pull <model>` |
-| 3. An API key for a cloud model | `openai`, `anthropic` | the provider's servers | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`; `OPENAI_BASE_URL` for compatible servers |
+| 2. A local model | `ollama`; or `openai` pointed at a local server (LM Studio, vLLM, llama.cpp) | your machine | install Ollama, `ollama pull <model>`; or `--base-url http://localhost:1234` |
+| 3. An API key for a cloud model | `openai` (OpenAI, OpenRouter, any compatible host), `anthropic` | the provider's servers | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`; `--base-url` or `OPENAI_BASE_URL` for non-OpenAI hosts |
+
+litsurvey treats `openai` with a loopback base URL as local (green banner,
+"local" in `doctor`); any other `openai` base URL is cloud.
 
 Selection order: `--backend` flag, then `backend` in the config file, then
 auto-detection. Auto-detection is deliberately conservative: a running
@@ -99,8 +102,10 @@ results. In our testing, on a laptop with 48 GB of unified memory:
 - **Gemma 3 27B**: good, also reads images if you use it elsewhere.
 - **gpt-oss 20B**: lighter, fits 16 GB machines.
 
-Ollama's default context window (4096 tokens) is too small for the agent's
-search results. Create a variant with a larger window once:
+Ollama's default context window depends on the version and the memory
+available (4k on older installs; check with `ollama ps` while a model is
+loaded). The agent needs at least 32k, better 64k, for its search results.
+If yours is smaller, create a variant with a larger window once:
 
 ```
 printf 'FROM qwen3:30b-thinking\nPARAMETER num_ctx 65536\n' > Modelfile

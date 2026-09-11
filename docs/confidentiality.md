@@ -29,9 +29,11 @@ what leaves the machine.
 5. Steps 3 and 4 repeat until the model writes the report.
 6. The report and the search log are printed and saved locally.
 
-So the public APIs only ever see the **keyword queries the model composed**.
-The LLM backend sees **everything**: your input text, the instructions, and
-every search result.
+So the public APIs see the **keyword queries the model composed**, plus the
+**paper identifiers** needed for citation lookups, recommendations and
+arXiv full-text retrieval. They never see your input text itself. The LLM
+backend sees **everything**: your input text, the instructions, and every
+search result.
 
 With the `cli` backend the flow is the same but the loop runs inside the
 vendor's agent (Claude Code, Codex, Gemini CLI) rather than inside
@@ -73,7 +75,8 @@ coloured banner before you press Run.
 - **Do not paste the manuscript.** litsurvey has no mode that reads a
   manuscript, on purpose. The tool assesses a claim you state.
 - **Use a local backend** for anything under embargo or review. Run
-  `litsurvey doctor`; the last line says which backend will be used.
+  `litsurvey doctor`; the "agent default" line says which backend will be
+  used and whether it is local.
 - **Check the search log.** Every report saved with `--out` ends with a table
   of every query that was sent out. If something in that table should not
   have left the machine, you will see it there.
@@ -81,7 +84,7 @@ coloured banner before you press Run.
 ## Where litsurvey stores data
 
 - `~/.litsurvey/config.json`: your API key and settings (file mode 600).
-- `~/.litsurvey/history.jsonl` and `~/.litsurvey/runs/`: every run's inputs
+- `~/.litsurvey/history.jsonl` and `~/.litsurvey/runs/`: every completed run's inputs
   and results, so the web page's History tab and `litsurvey history` can
   show them. This stays on your disk. Delete runs with
   `litsurvey history delete <id>` or the web page.

@@ -206,7 +206,9 @@ function refreshForm(){
     else { p.className="note warn"; p.textContent = "Ollama is not running or not installed. Start it (or install it from ollama.com and pull a model), then reload this page. Nothing will be sent to any cloud provider."; }
   } else {
     const be = $("backend").value, has = be==="anthropic" ? CONFIG.anthropic_key : CONFIG.openai_key;
-    p.className="note warn"; p.textContent = `Cloud model (${be}): your claim or question text and every search result will be sent to that provider. Do not use for confidential manuscript content.` + (has ? "" : ` No ${be} API key is configured; run "litsurvey init" or set the environment variable.`);
+    const baseNow = $("baseurl").value || CONFIG.openai_base_url || "";
+    if (be==="openai" && /localhost|127\.0\.0\.1|\[::1\]/i.test(baseNow)) { p.className="note ok"; p.textContent = `Local OpenAI-compatible server (${baseNow}): your text stays on this machine; only search terms and paper ids go to the scholarly APIs.`; }
+    else { p.className="note warn"; p.textContent = `Cloud model (${be}): your claim or question text and every search result will be sent to that provider. Do not use for confidential manuscript content.` + (has ? "" : ` No ${be} API key is configured; run "litsurvey init" or set the environment variable.`); }
   }
   checkUrl();
 }

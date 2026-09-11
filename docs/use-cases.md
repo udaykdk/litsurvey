@@ -42,7 +42,7 @@ Read the manuscript yourself. For each contribution the paper claims as new,
 state it as a generic topic and run:
 
 ```bash
-litsurvey doctor        # last line must say backend=ollama (local)
+litsurvey doctor        # the "agent default" line must say (local)
 litsurvey novelty "adaptive sampling of collocation points in physics-informed neural networks using residual gradients" --out claim1.md
 ```
 
@@ -72,7 +72,7 @@ litsurvey search "metasurface neural network surrogate optimisation" --year-from
 litsurvey search "data-driven electromagnetic structure design" -n 30 --out sweep3.csv
 
 # for each paper you already cite that is central, check who cited it recently
-litsurvey cites "DOI:10.xxxx/your-key-reference" -n 30 --year-from 2023
+litsurvey cites "DOI:10.xxxx/your-key-reference" -n 30 --sort year   # newest citers first
 
 # the recommender finds work that uses vocabulary you did not search for
 litsurvey related "DOI:10.xxxx/your-key-reference"
@@ -117,7 +117,7 @@ and hit counts. litsurvey records all of these.
 ```bash
 litsurvey search "digital twin structural health monitoring" --sources openalex,s2,arxiv -n 100 --out screen-A.csv
 litsurvey search "digital twin bridge monitoring" -n 100 --out screen-B.csv
-litsurvey history                       # every run has a date and hit counts per source
+litsurvey history                       # every completed search run has a date and hit counts per source
 ```
 
 Each run's JSON in `~/.litsurvey/runs/` holds the per-source hit counts

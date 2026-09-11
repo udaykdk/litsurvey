@@ -166,3 +166,13 @@ def test_hosted_openai_requires_a_model(monkeypatch):
         backends.resolve("openai", None, {"base_url": "https://openrouter.ai/api"})
     monkeypatch.setattr(backends, "openai_models", lambda base=None: ["local-model"])
     assert backends.resolve("openai", None, {"base_url": "http://localhost:1234"}) == ("openai", "local-model")
+
+
+def test_is_local_recognises_loopback_openai(monkeypatch):
+    assert backends.is_local("ollama")
+    assert backends.is_local("openai", "http://localhost:1234")
+    assert backends.is_local("openai", "http://127.0.0.1:8000/")
+    assert not backends.is_local("openai", "https://openrouter.ai/api")
+    assert not backends.is_local("anthropic") and not backends.is_local("cli")
+    monkeypatch.setitem(backends.CFG, "openai_base_url", "http://localhost:1234")
+    assert backends.is_local("openai")

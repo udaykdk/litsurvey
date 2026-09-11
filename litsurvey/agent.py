@@ -132,9 +132,9 @@ def run(kind, text, backend=None, model=None, rounds=8, progress=None, options=N
     say = progress or (lambda s: print(s, file=sys.stderr))
     if backend == "cli":
         return _run_cli(kind, text, model, rounds, say)
-    local = backend in backends.LOCAL_BACKENDS
+    local = backends.is_local(backend, (options or {}).get("base_url"))
     say(f"[agent] backend={backend} model={model} "
-        f"({'local, nothing leaves this machine except keyword queries' if local else 'CLOUD backend: the text below is sent to the provider'})")
+        f"({'local model; only search terms and paper ids go to the scholarly APIs' if local else 'CLOUD backend: the text below and all search results are sent to the provider'})")
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": user_tmpl.format(text=text)
                  + f"\n\nToday's year is {time.localtime().tm_year}. Begin searching."}]

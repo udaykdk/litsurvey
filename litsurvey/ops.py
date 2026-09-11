@@ -114,8 +114,9 @@ def linked_papers(mode, pid, n, sort, progress=None):
     """Citing papers / references, ranked by citation count (or year).
 
     OpenAlex can sort these server-side, so it is used whenever the paper has a
-    DOI. Semantic Scholar cannot sort its citation lists (they come newest
-    first), so it is the fallback for papers without a DOI."""
+    DOI. Semantic Scholar returns at most 100 citation rows per request (newest
+    first), which are then sorted locally; it is the fallback for papers
+    without a DOI."""
     say = progress or (lambda s: print(s, file=__import__("sys").stderr))
     doi = pid[4:] if pid.upper().startswith("DOI:") else ""
     if not doi:
@@ -135,9 +136,9 @@ def linked_papers(mode, pid, n, sort, progress=None):
             say("[note] OpenAlex has no " + ("citations" if mode == "cites" else "reference list")
                 + " for this paper (common for preprints); trying Semantic Scholar")
         except Exception as e:  # noqa: BLE001
-            say(f"[warn] OpenAlex lookup failed ({e}); falling back to Semantic Scholar (newest first)")
+            say(f"[warn] OpenAlex lookup failed ({e}); falling back to Semantic Scholar (100 newest rows, sorted locally)")
     else:
-        say("[note] paper has no DOI; using Semantic Scholar, whose citation lists come newest first")
+        say("[note] paper has no DOI; using Semantic Scholar (its 100 newest rows, sorted locally)")
     direction = "citations" if mode == "cites" else "references"
     plist = semanticscholar.linked(pid, direction, limit=max(n, 100))
     return sort_papers(plist, sort)[:n]

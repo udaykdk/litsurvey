@@ -190,7 +190,7 @@ def cmd_init(args):
 def cmd_doctor(args):
     from .sources import arxiv, crossref, iacr, openalex, semanticscholar
     cfg = config.load()
-    ok = True
+    ok, warnings = True, []
     print(f"litsurvey {__version__}, python {sys.version.split()[0]}")
     if os.path.exists(config.CONFIG_PATH):
         print(f"config       : {config.CONFIG_PATH}")
@@ -214,6 +214,8 @@ def cmd_doctor(args):
         except Exception as e:  # noqa: BLE001
             if name in ("openalex", "semanticscholar", "arxiv"):
                 ok = False
+            else:
+                warnings.append(name)
             print(f"{name:14s}: FAIL - {e}")
     try:
         names = backends.ollama_models()
@@ -227,7 +229,7 @@ def cmd_doctor(args):
     agent_line = None
     try:
         be, model = backends.resolve()
-        local = be in backends.LOCAL_BACKENDS
+        local = backends.is_local(be)
         where = "local" if local else ("subscription CLI, text goes to the vendor" if be == "cli" else "CLOUD")
         print(f"agent default: backend={be} model={model} ({where})")
         agent_line = f"novelty/research will use {be} {'tool' if be == 'cli' else 'model'} {model} ({where})"
@@ -236,14 +238,17 @@ def cmd_doctor(args):
     except Exception as e:  # noqa: BLE001
         print(f"agent default: none ({e})")
     print()
+    print("(doctor does not test Unpaywall, and does not make an LLM call; it only detects backends.)")
+    tail = f" Minor sources failed: {', '.join(warnings)}; searches still work without them." if warnings else ""
     if not ok:
-        print("RESULT: PROBLEMS. One or more sources failed (see FAIL lines above); "
+        print("RESULT: PROBLEMS. A core source failed (see FAIL lines above); "
               "search results will be incomplete. Check your network, then `litsurvey doctor --debug`.")
     elif agent_line:
-        print("RESULT: ALL OK. Search, citation and open-access commands work; " + agent_line + ".")
+        print(("RESULT: OK WITH WARNINGS." if warnings else "RESULT: ALL OK.")
+              + " Search, citation and open-access commands work; " + agent_line + "." + tail)
     else:
-        print("RESULT: OK for search. novelty/research are unavailable until an LLM backend "
-              "is set up (see docs/llm-integration.md); everything else works.")
+        print(("RESULT: OK WITH WARNINGS" if warnings else "RESULT: OK") + " for search. novelty/research are "
+              "unavailable until an LLM backend is set up (see docs/llm-integration.md)." + tail)
     print("You do not need to run doctor regularly: use it after install, or when something fails.")
     sys.exit(0 if ok else 1)
 

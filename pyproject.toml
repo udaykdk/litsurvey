@@ -9,8 +9,8 @@ description = "Multi-source scientific literature search with optional LLM-drive
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
-authors = [{name = "Uday K Khankhoje", email = "uday@ee.iitm.ac.in"}]
-keywords = ["literature search", "semantic scholar", "openalex", "arxiv", "peer review", "systematic review", "bibtex", "llm", "ollama"]
+authors = [{name = "Uday Khankhoje", email = "uday@ee.iitm.ac.in"}]
+keywords = ["literature search", "literature survey", "semantic scholar", "openalex", "arxiv", "crossref", "peer review", "novelty", "systematic review", "bibtex", "llm", "ollama", "claude code"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Environment :: Console",

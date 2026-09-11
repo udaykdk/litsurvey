@@ -22,7 +22,9 @@ All list commands share these options:
 | `--json` | print the full records as JSON instead of text |
 | `--out FILE` | also write the list; the extension picks the format: `.bib`, `.ris`, `.csv`, `.json`, `.md` |
 
-Every run is recorded in the history (see `history` below).
+Every successfully completed run is recorded in the history (see `history`
+below); a failed run, or a title lookup abandoned at the candidate list, is
+not.
 
 ## search
 
@@ -83,7 +85,9 @@ $ litsurvey cites "superior thermal conductivity graphene" --pick 1
 for newest first). For a paper with a DOI they use OpenAlex, which ranks
 citing works server-side, so a paper with thousands of citations shows its
 most influential citers rather than the newest few. Papers without a DOI
-fall back to Semantic Scholar, whose citation lists come newest first.
+fall back to Semantic Scholar, which returns at most 100 rows (newest
+first); litsurvey then sorts those locally by citations or year. There is no
+`--year-from` on `cites`/`refs`; use `--sort year` or filter the exported file.
 `related` uses a recommendation model on Semantic Scholar's servers, which
 finds papers on the same topic that use different words. When Semantic
 Scholar is unavailable (it returns 429 or 500 under load), `related` and
@@ -120,7 +124,9 @@ Gemini subscription CLI; `--model` names the tool), `--backend ollama`
 (local), or `--backend openai` / `anthropic` (API keys). See
 [llm-integration.md](llm-integration.md).
 The model plans keyword queries, calls the search tools, walks citations of
-near hits, may read one or two arXiv papers in full, and writes a report.
+near hits, and writes a report. The built-in loop (ollama, openai,
+anthropic backends) may also read one or two arXiv papers in full; the
+subscription-CLI backend works from abstracts only.
 
 - `novelty` writes: closest prior work, what is new versus prior art, a
   verdict with confidence, and citations for the reviewer.
@@ -161,39 +167,50 @@ round.
 
 ```bash
 litsurvey init      # asks for the Semantic Scholar key, your email, and the LLM backend; writes ~/.litsurvey/config.json
-litsurvey doctor    # checks every API and backend; paste its output into bug reports
+litsurvey doctor    # checks the search sources and detects LLM backends; paste its output into bug reports
 ```
 
 Neither command is required. `init` is the convenient way to store the
 key; `doctor` is a diagnostic. Run `doctor` once after installing, to
 confirm the key and any LLM backend are seen, and again whenever a command
-fails. It makes one small test query per source and ends with a one-line
-verdict: `RESULT: ALL OK`, `RESULT: OK for search` (no LLM backend), or
-`RESULT: PROBLEMS`. A few `[warn] HTTP 429` lines before a source reports
-OK are normal; they mean the API rate-limited the request and the retry
-succeeded.
+fails. It makes one small test query to each of the six search sources,
+detects Ollama and any subscription CLI on PATH, and reports whether cloud
+keys are configured. It does not query Unpaywall and does not make an LLM
+call. It ends with a `RESULT:` verdict followed by one advisory line:
+`ALL OK`, `OK WITH WARNINGS` (a minor source such as IACR failed; searches
+still work), `OK for search` (no LLM backend found), or `PROBLEMS` (a core
+source failed; exit code 1). A few `[warn] HTTP 429` lines before a source
+reports OK are normal; they mean the API rate-limited the request and the
+retry succeeded.
 
 ```console
 $ litsurvey doctor
 litsurvey 1.0.0, python 3.12.4
-config       : /Users/me/.litsurvey/config.json (found)
+config       : /Users/me/.litsurvey/config.json
 S2 API key   : set (s2k-…)
 email        : me@university.edu
-openalex     : OK (2 results)
+openalex      : OK (2 results)
 semanticscholar: OK (2 results)
-arxiv        : OK (2 results)
+arxiv         : OK (2 results)
+techrxiv      : OK (2 results)
+researchsquare: OK (2 results)
+iacr          : OK (2 results)
 ollama       : OK at http://localhost:11434 (3 models: qwen3:30b, gemma3:27b, …)
+subscr. CLIs : claude (claude / codex / gemini on PATH)
 openai       : no key, base https://api.openai.com
 anthropic    : no key
 agent default: backend=ollama model=qwen3:30b (local)
 
+(doctor does not test Unpaywall, and does not make an LLM call; it only detects backends.)
 RESULT: ALL OK. Search, citation and open-access commands work; novelty/research will use ollama model qwen3:30b (local).
 You do not need to run doctor regularly: use it after install, or when something fails.
 ```
 
-Environment variables override the config file: `S2_API_KEY`,
-`OPENALEX_MAILTO`, `LITSURVEY_BACKEND`, `LITSURVEY_MODEL`, `OLLAMA_HOST`,
-`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`.
+Environment variables override the config file: `S2_API_KEY` (or
+`LITSURVEY_S2_API_KEY`), `OPENALEX_MAILTO` (or `LITSURVEY_MAILTO`),
+`LITSURVEY_BACKEND`, `LITSURVEY_MODEL`, `LITSURVEY_CLI_TOOL`,
+`LITSURVEY_CLI_COMMAND`, `OLLAMA_HOST`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`.
 
 ## web
 

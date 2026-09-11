@@ -97,6 +97,7 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:  # noqa: BLE001
                     pass
                 info["openai_base_url"] = cfg["openai_base_url"]
+                info["openai_local"] = backends.is_local("openai")
                 info["cli_tools"] = backends.cli_tools_available() + (["custom"] if cfg["cli_command"] else [])
                 info["cli_tool"] = cfg["cli_tool"]
                 info["openai_key"] = bool(cfg["openai_api_key"])
