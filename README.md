@@ -54,10 +54,27 @@ pip install git+https://github.com/udaykdk/litsurvey
 
 Or clone and run without installing: `python3 -m litsurvey --help`.
 
-Then, optional but recommended: get a free Semantic Scholar API key
-(a one-minute form, see [docs/api-keys.md](https://github.com/udaykdk/litsurvey/blob/main/docs/api-keys.md))
-and store it with `litsurvey init`. Without it everything works, only
-slower. `litsurvey doctor` checks the setup and prints a `RESULT:` verdict.
+### The Semantic Scholar key (optional, recommended)
+
+Five of the six sources need no key at all. Semantic Scholar works without
+one too, but on a shared pool that is often rate-limited and at busy times
+refuses every request. A free key gives you a dedicated one request per
+second and makes the citation-graph and recommendation lookups reliable.
+
+1. Request it at https://www.semanticscholar.org/product/api (the API key
+   request form; name, email and a one-line purpose such as "literature
+   search for academic research"). Approval comes by email, usually within
+   a day or two.
+2. Store it with `litsurvey init` (writes `~/.litsurvey/config.json`), or
+   set the environment variable `S2_API_KEY`. The same step stores your
+   email, which gets you OpenAlex's and Crossref's faster polite pools.
+
+Without the key: searches still return results from OpenAlex, arXiv,
+Crossref and IACR in about ten seconds; `cites`, `refs`, `related` and
+`paper` fall back to OpenAlex for any paper with a DOI; the LLM agents run
+but see fewer results. `litsurvey doctor` reports the state and prints a
+`RESULT:` verdict. Details in
+[docs/api-keys.md](https://github.com/udaykdk/litsurvey/blob/main/docs/api-keys.md).
 
 ## Examples
 

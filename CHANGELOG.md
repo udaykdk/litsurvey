@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-11
+
+### Fixed
+- Without a Semantic Scholar key, searches took about a minute because the
+  refusing shared pool was retried five times; keyless retries are now
+  capped at two (about ten seconds), and `doctor` reports a keyless Semantic
+  Scholar failure as a warning instead of a problem.
+- `related` returned nothing when Semantic Scholar answered with an empty
+  list; it now falls back to OpenAlex related works, which also no longer
+  include the paper itself.
+- Custom subscription-CLI commands on Windows lost the backslashes in paths.
+- The web page's Search label listed three sources; it now says six.
+
+### Added
+- The web page accepts `?mode=<mode>&text=<query>` in the URL to preselect a
+  mode and fill the input.
+- README: screenshot, and how to get the Semantic Scholar key and what
+  happens without it.
+
 ## [1.0.0] - 2026-09-11
 
 First public release.
