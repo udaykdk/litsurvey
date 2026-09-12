@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "litsurvey"
-version = "1.0.1"
+version = "1.1.0"
 description = "Multi-source scientific literature search with optional LLM-driven novelty assessment and deep research. Zero dependencies."
 readme = "README.md"
 requires-python = ">=3.10"

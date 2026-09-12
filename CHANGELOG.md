@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-12
+
 ### Added
 - **PubMed** as a default search source, through the NCBI E-utilities
   (esearch for the matching record ids, efetch for the records, so abstracts
