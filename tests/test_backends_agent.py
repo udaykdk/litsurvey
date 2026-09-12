@@ -422,3 +422,11 @@ def test_codex_runs_in_a_throwaway_working_directory(monkeypatch):
     monkeypatch.setattr(backends.subprocess, "run", fake_run)
     backends.run_cli("codex", "task")
     assert not os.path.exists(seen["workdir"])       # removed afterwards
+
+
+def test_custom_commands_ignore_cli_model(monkeypatch):
+    """litsurvey cannot know where a custom command line wants a model flag."""
+    monkeypatch.setitem(backends.CFG, "cli_command", "mytool -p {prompt}")
+    monkeypatch.setitem(backends.CFG, "cli_model", "opus")
+    monkeypatch.setitem(backends.CFG, "cli_effort", "high")
+    assert backends.cli_command("custom")[0] == ["mytool", "-p", "{prompt}"]

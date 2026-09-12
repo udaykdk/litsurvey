@@ -61,7 +61,7 @@ or `custom`. The commands used are:
 | claude | `claude -p --model <model> --effort <effort> --output-format text --allowedTools "Bash(litsurvey:*)"`, prompt on stdin |
 | codex | `codex exec -c model_reasoning_effort=<effort> --skip-git-repo-check --sandbox workspace-write --add-dir ~/.litsurvey -c sandbox_workspace_write.network_access=true -o <tmpfile> "<prompt>"` |
 | gemini | `gemini --yolo -o text -p "<prompt>"` |
-| custom | whatever `cli_command` in the config says; `{prompt}` is substituted, otherwise the prompt is passed on stdin |
+| custom | whatever `cli_command` in the config says; `{prompt}` is substituted, otherwise the prompt is passed on stdin. `{datadir}` and `{outfile}` are substituted too, so a custom command can be given the history directory and a file to write its final message to |
 
 Codex runs in an empty temporary directory (`-C`), created per run and
 deleted afterwards, so `workspace-write` gives it a scratch area and
@@ -124,6 +124,10 @@ re-runs the poll rather than sending, say, `opus` to codex.
 agent default: backend=cli model=codex (subscription CLI, text goes to the vendor)
   codex run as: model=(tool default) effort=high  [set cli_model / cli_effort in the config, or '-' to leave the tool alone]
 ```
+
+`cli_tool: custom` is the exception: litsurvey cannot know where your command
+line wants a model or effort flag, so `cli_model` and `cli_effort` are ignored
+for it. Put the flags you want in `cli_command` itself.
 
 To override, run `litsurvey init` again, or set `cli_model` and `cli_effort`
 in `~/.litsurvey/config.json` (or `LITSURVEY_CLI_MODEL` / `LITSURVEY_CLI_EFFORT`
