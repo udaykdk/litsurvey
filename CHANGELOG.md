@@ -6,6 +6,47 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **PubMed** as a default search source, through the NCBI E-utilities
+  (esearch for the matching record ids, efetch for the records, so abstracts
+  come back and the LLM agents can judge relevance). More than 40 million
+  biomedical citations, authoritatively indexed; the general indexes cover
+  much of the same ground but not with PubMed's subject indexing. Journal
+  articles and book/chapter records are both parsed.
+- **Europe PMC** as an opt-in source (`--sources europepmc`): PubMed's ground
+  again, but with citation counts and the bioRxiv/medRxiv preprints. Off by
+  default because it largely repeats PubMed.
+- Subscription CLI backends now run at a deliberate model and reasoning
+  effort instead of the tool's own maximum. `litsurvey init` asks the
+  installed binary what it supports and picks one model below the best at an
+  effort level in the middle of the range — for Claude Code, Opus at `high`.
+  Stored as `cli_model` / `cli_effort` in the config (`"-"` means "leave the
+  tool at its own default"), shown by `litsurvey doctor`, and overridable
+  with `LITSURVEY_CLI_MODEL` / `LITSURVEY_CLI_EFFORT`. The stored choice
+  belongs to the tool it was made for, so switching `cli_tool` re-runs the
+  poll instead of passing a Claude model name to codex.
+
+### Fixed
+- **The `codex` CLI backend was broken**: `codex exec --full-auto` no longer
+  exists (removed by codex-cli; it fails with "unexpected argument"). The
+  command is now `codex exec --skip-git-repo-check --sandbox workspace-write
+  --add-dir ~/.litsurvey -c sandbox_workspace_write.network_access=true`.
+  Without the sandbox flags codex has no network — every `litsurvey` call
+  inside it returns nothing while codex still exits 0 and writes a
+  confident, empty report — refuses to start outside a git repository, and
+  cannot write the run history. Codex is given an empty temporary directory
+  as its working root, so its write sandbox covers a scratch area and
+  `~/.litsurvey` rather than the directory you started from. Verified end to
+  end against codex-cli 0.153.4.
+- A subscription CLI's final report is now read from a file it writes
+  (`-o`), not from stdout, which also carries progress and tool-call
+  chatter.
+
+### Notes
+- DBLP was considered and left out: its search API sits behind a
+  proof-of-work bot wall on every mirror (dblp.org, dblp.uni-trier.de,
+  dblp.dagstuhl.de), which litsurvey will not try to defeat.
+
 ## [1.0.1] - 2026-09-11
 
 ### Fixed

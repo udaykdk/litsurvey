@@ -1,13 +1,15 @@
 # API keys and running without them
 
-litsurvey uses six public services. None requires payment. Only one offers
-a key, and it is optional.
+litsurvey uses eight public services. None requires payment. Only one
+offers a key, and it is optional.
 
 | Service | Used for | Needs | Without it |
 |---|---|---|---|
 | OpenAlex | search, citation ranking, fallbacks | nothing; an email address gets the faster "polite pool" | works, slightly slower |
 | Semantic Scholar | search, citation graph, recommendations | nothing; a free API key gives a dedicated 1 request/second | works on a shared pool; frequent rate-limit retries, `related` most affected |
 | arXiv | search, full text for the agent | nothing | n/a |
+| PubMed (NCBI E-utilities) | biomedical search | nothing; the same email identifies polite callers | n/a |
+| Europe PMC (EBI) | opt-in `--sources europepmc` | nothing | n/a |
 | Crossref | TechRxiv and Research Square search | nothing; the same email gets its polite pool | works, slightly slower |
 | IACR ePrint | cryptography preprint search | nothing | n/a |
 | Unpaywall | open-access lookup | an email address | works with a placeholder address |
@@ -56,8 +58,9 @@ Never paste the key into an issue report; `--debug` output does not print it.
 With a key, searches return in a few seconds and the citation-graph and
 recommendation commands are reliable. Without a key, Semantic Scholar's
 shared pool often answers 429 and at busy times refuses every request;
-litsurvey retries once and moves on, so a keyless search takes about ten
-seconds and still returns results from the other five sources. `cites`,
+litsurvey retries once and moves on, so a keyless search still returns
+results from the other six default sources in the usual ten to twenty
+seconds. `cites`,
 `refs`, `related` and `paper` fall back to OpenAlex for any paper with a
 DOI, so they keep working too; only ids without a DOI depend on Semantic
 Scholar alone. `doctor` reports a keyless Semantic Scholar failure as a

@@ -1,5 +1,10 @@
 # The browser interface
 
+**This is the easiest way to use litsurvey, and the one to start with.**
+Everything the command line does for searching, lookups, the LLM agents and
+the history is here as a form, with buttons for sorting and downloads and
+nothing to memorise.
+
 ```bash
 litsurvey web
 ```
@@ -9,9 +14,10 @@ opens the page in your default browser. Nothing is served to the network;
 only programs on your computer can reach it. Stop it with Ctrl-C in the
 terminal.
 
-The page covers the main search, lookup, agent and history operations, for
-people who prefer forms to flags. A few options stay command-line only:
-`--sources`, `--scholar`, `--debug`, `init` and `doctor`.
+The page covers the main search, lookup, agent and history operations. A few
+options stay command-line only: `--sources` (choosing which indexes to
+query), `--scholar`, `--debug`, `init` and `doctor`. Reach for the command
+line when you want to script something or need one of those.
 
 ## The Run tab
 

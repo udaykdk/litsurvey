@@ -45,8 +45,18 @@ add a fixture for the new response shape in `tests/test_sources.py`.
    year_from)` function that returns a list of `papers.make(...)` records
    with `sources=["<name>"]`.
 2. Register it in `litsurvey/sources/__init__.py` (`SOURCES`).
-3. Add the host's rate limit to `http.HOST_INTERVAL`.
-4. Add a parsing test with a fixture, and a line in `docs/cli.md`.
+3. Add the host's rate limit to `http.HOST_INTERVAL`, and a readable name
+   to `http.FRIENDLY`.
+4. Add a parsing test with a fixture, and a row in the source table in
+   `docs/cli.md`.
+5. Decide whether it belongs in `DEFAULT_SOURCES`. A source that mostly
+   repeats one already there should be opt-in: each default source adds a
+   second or two to every search. Keep the search function's results in the
+   provider's own relevance order — the rank fusion in `papers.merge()`
+   depends on it, so do not ask the API to sort by citations or date.
+6. If a source fails only for some fields (a biomedical index, say), add it
+   to the warning list rather than the failure list in `cmd_doctor`, so one
+   provider having a bad day does not report the whole install as broken.
 
 ## Pull requests
 

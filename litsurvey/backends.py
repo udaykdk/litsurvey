@@ -10,14 +10,16 @@ chat() returns {"content": str, "tool_calls": [{"id", "name", "args"}]}.
 """
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import uuid
 
 from . import http
-from .config import CFG
+from .config import CFG, DATA_DIR
 
 BACKENDS = ("cli", "ollama", "openai", "anthropic")
 LOCAL_BACKENDS = ("ollama",)   # data never leaves the machine
@@ -35,14 +37,42 @@ def is_local(backend, base_url=None):
 
 # Subscription command-line agents. Each is run non-interactively with the task as
 # its prompt; it uses the `litsurvey` command itself as its search tool.
+#
+# Placeholders substituted in cli_command()/run_cli():
+#   {prompt}   the task text (tools with "stdin": True get it on stdin instead)
+#   {datadir}  ~/.litsurvey, so a sandboxed agent may write the run history
+#   {workdir}  an empty temporary directory used as the agent's working root,
+#              so a write sandbox scoped to "the workspace" cannot reach the
+#              user's files
+#   {outfile}  a temporary file the tool writes its final message to; preferred
+#              over stdout, which also carries progress and tool-call chatter
+#
+# "models" is a capability ordering, highest first. A tool's --help says which
+# names the installed build knows but never ranks them, so the ranking lives
+# here; an empty tuple means "do not pass a model, use the tool's own default".
+# "efforts" is a fallback ladder, lowest first, for tools whose --help does not
+# enumerate the levels. See probe() for how a default is picked from these.
 CLI_TOOLS = {
     "claude": {"label": "Claude Code (Claude Pro / Max subscription)",
                "argv": ["claude", "-p", "--output-format", "text",
-                        "--allowedTools", "Bash(litsurvey:*)"], "stdin": True},
+                        "--allowedTools", "Bash(litsurvey:*)"], "stdin": True,
+               "model_flag": ("--model", "{v}"), "effort_flag": ("--effort", "{v}"),
+               "models": ("fable", "opus", "sonnet", "haiku"), "efforts": ()},
+    # codex exec sandboxes the commands it runs: without these it has no network
+    # (so every litsurvey call returns nothing), refuses to start outside a git
+    # repository, and cannot write the run history under ~/.litsurvey.
     "codex": {"label": "Codex CLI (ChatGPT subscription)",
-              "argv": ["codex", "exec", "--full-auto", "{prompt}"], "stdin": False},
+              "argv": ["codex", "exec", "--skip-git-repo-check", "-C", "{workdir}",
+                       "--sandbox", "workspace-write", "--add-dir", "{datadir}",
+                       "-c", "sandbox_workspace_write.network_access=true",
+                       "-o", "{outfile}", "{prompt}"], "stdin": False,
+              "model_flag": ("-m", "{v}"), "effort_flag": ("-c", "model_reasoning_effort={v}"),
+              "models": (),
+              "efforts": ("minimal", "low", "medium", "high", "xhigh", "max")},
     "gemini": {"label": "Gemini CLI (Google account)",
-               "argv": ["gemini", "--yolo", "-o", "text", "-p", "{prompt}"], "stdin": False},
+               "argv": ["gemini", "--yolo", "-o", "text", "-p", "{prompt}"], "stdin": False,
+               "model_flag": ("-m", "{v}"), "effort_flag": None,
+               "models": (), "efforts": ()},
 }
 
 
@@ -63,25 +93,162 @@ def cli_tools_available():
     return [t for t in CLI_TOOLS if shutil.which(t)]
 
 
+# ------------------------------------------------- what the installed CLI supports
+
+_HELP_CACHE = {}
+
+
+def cli_help(tool, timeout=20):
+    """The tool's own `--help` text, or '' when it cannot be run. Used to ask the
+    installed binary what it supports instead of assuming a version. Cached: the
+    answer cannot change while the process runs, and this shells out."""
+    if tool in _HELP_CACHE:
+        return _HELP_CACHE[tool]
+    _HELP_CACHE[tool] = ""
+    if not shutil.which(tool):
+        return ""
+    try:
+        proc = subprocess.run([tool, "--help"], capture_output=True, text=True,
+                              timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    _HELP_CACHE[tool] = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    return _HELP_CACHE[tool]
+
+
+def help_block(text, flag):
+    """The help paragraph describing one option: the line introducing `flag` plus
+    the indented continuation lines that wrap its description."""
+    lines = (text or "").splitlines()
+    out, indent = [], None
+    for line in lines:
+        stripped = line.strip()
+        if indent is None:
+            # an option definition, not a mention in a Usage: or prose line
+            if stripped.startswith("-") and re.search(
+                    r"(^|[\s,])" + re.escape(flag) + r"([\s,=<\[]|$)", line):
+                indent = len(line) - len(line.lstrip())
+                out.append(stripped)
+            continue
+        if not stripped:                      # blank line ends the paragraph
+            break
+        cur = len(line) - len(line.lstrip())
+        if cur <= indent and stripped.startswith("-"):   # the next option starts
+            break
+        out.append(stripped)
+    return " ".join(out)
+
+
+def parse_choices(block):
+    """Lowercase words from the first comma-separated list inside a help paragraph,
+    e.g. "(low, medium, high, xhigh, max)" or "[possible values: a, b, c]"."""
+    for m in re.finditer(r"[(\[]([^()\[\]]*,[^()\[\]]*)[)\]]", block or ""):
+        inner = re.sub(r"^\s*(possible values|choices|values)\s*:\s*", "",
+                       m.group(1), flags=re.I)
+        words = [w.strip().strip("'\"") for w in inner.split(",")]
+        words = [w for w in words if re.fullmatch(r"[a-z][a-z0-9_-]{1,30}", w)]
+        if len(words) >= 2:
+            return words
+    return []
+
+
+def _mentioned_models(block, known):
+    """The models this build mentions, kept in the capability order given."""
+    return [m for m in known
+            if re.search(r"(^|[^a-z0-9-])" + re.escape(m) + r"([^a-z0-9-]|$)", block or "")]
+
+
+def probe(tool):
+    """Ask the installed CLI what it supports and choose a deliberate default:
+    one step below the top model, and an effort level near the middle of the
+    range. A subscription CLI otherwise runs at its own maximum, which is more
+    model and more thinking time than a literature search needs.
+
+    Returns {"model", "effort", "models", "efforts"}. "" means nothing could be
+    established, and then no flag is passed and the tool keeps its own setting.
+    Models are only ever those the installed build names in its own --help.
+    Effort levels come from --help when it enumerates them and otherwise from
+    the tool's known ladder in CLI_TOOLS, because some tools take an effort
+    setting without documenting its values. Never raises."""
+    spec = CLI_TOOLS.get(tool) or {}
+    text = cli_help(tool) if spec else ""
+    models, efforts = [], []
+    if spec.get("model_flag") and spec.get("models"):
+        models = _mentioned_models(help_block(text, spec["model_flag"][0]), spec["models"])
+    if spec.get("effort_flag"):
+        efforts = parse_choices(help_block(text, spec["effort_flag"][0])) or list(spec["efforts"])
+        efforts = [e for e in efforts if e != "none"]   # "none" turns reasoning off
+    # highest minus one, so a heavy top-tier model is not spent on a search task
+    model = models[1] if len(models) >= 2 else ""
+    # middle of the ladder: enough reasoning for a survey, far below the maximum
+    effort = efforts[len(efforts) // 2] if len(efforts) >= 3 else ""
+    return {"model": model, "effort": effort, "models": models, "efforts": efforts}
+
+
+def cli_defaults(tool):
+    """The (model, effort) actually used: a stored choice wins, else probe(). A
+    value of "-" means "pass nothing, use the tool's own default".
+
+    Model names do not carry across tools -- "opus" means nothing to codex -- so
+    a stored cli_model/cli_effort applies only to the tool it was chosen for,
+    which is the cli_tool recorded beside it. An environment variable is an
+    explicit per-run override and always applies."""
+    owner = CFG.get("cli_tool") or ""
+    mine = owner in ("", tool)
+    model = os.environ.get("LITSURVEY_CLI_MODEL") or (CFG.get("cli_model") if mine else "") or ""
+    effort = os.environ.get("LITSURVEY_CLI_EFFORT") or (CFG.get("cli_effort") if mine else "") or ""
+    if not (model and effort):
+        found = probe(tool)
+        model = model or found["model"]
+        effort = effort or found["effort"]
+    return ("" if model == "-" else model), ("" if effort == "-" else effort)
+
+
 def cli_command(tool):
     """(argv, use_stdin) for a tool name or 'custom'."""
     if tool == "custom":
         if not CFG["cli_command"]:
             raise RuntimeError("cli_tool=custom needs cli_command in the config")
-        argv = split_command(CFG["cli_command"])
+        argv = [a.replace("{datadir}", DATA_DIR) for a in split_command(CFG["cli_command"])]
         return argv, not any("{prompt}" in a for a in argv)
     if tool not in CLI_TOOLS:
         raise RuntimeError(f"unknown CLI tool {tool!r}; use one of {list(CLI_TOOLS)} or custom")
     if not shutil.which(tool):
         raise RuntimeError(f"{tool!r} is not on PATH; install it and sign in, or choose another backend")
-    return list(CLI_TOOLS[tool]["argv"]), CLI_TOOLS[tool]["stdin"]
+    spec = CLI_TOOLS[tool]
+    argv = list(spec["argv"])
+    model, effort = cli_defaults(tool)
+    extra = []
+    if model and spec.get("model_flag"):
+        extra += [a.replace("{v}", model) for a in spec["model_flag"]]
+    if effort and spec.get("effort_flag"):
+        extra += [a.replace("{v}", effort) for a in spec["effort_flag"]]
+    if extra:                       # after the subcommand, before the prompt
+        argv = argv[:2] + extra + argv[2:] if len(argv) > 2 else argv + extra
+    argv = [a.replace("{datadir}", DATA_DIR) for a in argv]
+    return argv, spec["stdin"]
 
 
 def run_cli(tool, prompt, timeout=1800):
     """Hand the whole task to a subscription CLI agent; return its final text."""
     argv, use_stdin = cli_command(tool)
+    # substitute the template's own placeholders first; the prompt goes in last
+    # so that a claim containing the literal text "{outfile}" is not rewritten
+    outfile = ""
+    if any("{outfile}" in a for a in argv):
+        fd, outfile = tempfile.mkstemp(prefix="litsurvey-cli-", suffix=".txt")
+        os.close(fd)
+        argv = [a.replace("{outfile}", outfile) for a in argv]
+    workdir = ""
+    if any("{workdir}" in a for a in argv):
+        workdir = tempfile.mkdtemp(prefix="litsurvey-cli-")
+        argv = [a.replace("{workdir}", workdir) for a in argv]
     if not use_stdin:
         argv = [a.replace("{prompt}", prompt) for a in argv]
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)   # a sandboxed agent cannot create it
+    except OSError:
+        pass
     env = dict(os.environ)
     env.pop("CLAUDECODE", None)   # allow launching Claude Code from inside a Claude Code session
     try:
@@ -91,10 +258,25 @@ def run_cli(tool, prompt, timeout=1800):
         raise RuntimeError(f"could not start {argv[0]!r}") from None
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"{tool} did not finish within {timeout} s") from None
+    finally:
+        final = ""
+        if outfile:
+            try:
+                with open(outfile, encoding="utf-8", errors="replace") as f:
+                    final = f.read().strip()
+            except Exception:  # noqa: BLE001 - never mask the real failure below
+                final = ""
+            finally:
+                try:
+                    os.unlink(outfile)
+                except OSError:
+                    pass
+        if workdir:
+            shutil.rmtree(workdir, ignore_errors=True)
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip()[-800:]
         raise RuntimeError(f"{tool} exited with code {proc.returncode}: {detail}")
-    out = proc.stdout.strip()
+    out = final or proc.stdout.strip()
     if not out:
         raise RuntimeError(f"{tool} produced no output; stderr: {proc.stderr.strip()[-400:]}")
     return out

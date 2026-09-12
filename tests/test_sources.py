@@ -1,5 +1,8 @@
 from litsurvey import http
-from litsurvey.sources import arxiv, crossref, iacr, openalex, semanticscholar, unpaywall
+import pytest
+
+from litsurvey.sources import arxiv, crossref, europepmc, iacr, openalex
+from litsurvey.sources import pubmed, semanticscholar, unpaywall
 from litsurvey.sources import run_search
 
 OA = {"results": [{
@@ -162,3 +165,123 @@ def test_iacr_parse(monkeypatch):
     assert len(iacr.parse(IACR_HTML, year_from=2020)) == 1
     monkeypatch.setattr(http, "get", lambda url, **k: IACR_HTML.encode())
     assert iacr.search("lattice", limit=1)[0]["year"] == 2026
+
+
+PUBMED_IDS = {"esearchresult": {"idlist": ["40000001", "40000002"]}}
+
+PUBMED_XML = b"""<?xml version="1.0"?>
+<PubmedArticleSet>
+<PubmedArticle><MedlineCitation><PMID>40000001</PMID><Article>
+<Journal><ISOAbbreviation>Brief Bioinform</ISOAbbreviation>
+<JournalIssue><PubDate><Year>2023</Year></PubDate></JournalIssue></Journal>
+<ArticleTitle>A <i>CRISPR</i> method.</ArticleTitle>
+<Abstract><AbstractText Label="BACKGROUND">We looked.</AbstractText>
+<AbstractText Label="RESULTS">We found   things.</AbstractText></Abstract>
+<AuthorList><Author><LastName>Zhang</LastName><ForeName>Guishan</ForeName></Author>
+<Author><CollectiveName>The Group</CollectiveName></Author></AuthorList>
+</Article></MedlineCitation>
+<PubmedData><ArticleIdList><ArticleId IdType="pubmed">40000001</ArticleId>
+<ArticleId IdType="doi">10.1093/bib/bbad333</ArticleId></ArticleIdList></PubmedData></PubmedArticle>
+<PubmedArticle><MedlineCitation><PMID>40000002</PMID><Article>
+<Journal><Title>Old Journal</Title>
+<JournalIssue><PubDate><MedlineDate>2001 Spring</MedlineDate></PubDate></JournalIssue></Journal>
+<ArticleTitle>An older paper</ArticleTitle></Article></MedlineCitation></PubmedArticle>
+</PubmedArticleSet>"""
+
+
+def test_pubmed_parse():
+    out = pubmed.parse(PUBMED_XML)
+    assert len(out) == 2
+    p = out[0]
+    assert p["title"] == "A CRISPR method"          # markup flattened, trailing dot dropped
+    assert p["year"] == 2023 and p["venue"] == "Brief Bioinform"
+    assert p["doi"] == "10.1093/bib/bbad333" and p["sources"] == ["pubmed"]
+    assert p["authors"] == ["Guishan Zhang", "The Group"]
+    assert p["abstract"] == "BACKGROUND: We looked. RESULTS: We found things."
+    assert p["url"] == "https://pubmed.ncbi.nlm.nih.gov/40000001/"
+    assert out[1]["year"] == 2001 and out[1]["venue"] == "Old Journal"   # MedlineDate fallback
+    assert len(pubmed.parse(PUBMED_XML, year_from=2010)) == 1
+
+
+def test_pubmed_search_two_calls(monkeypatch):
+    seen = []
+    monkeypatch.setattr(http, "get_json", lambda url, **k: seen.append(url) or PUBMED_IDS)
+    monkeypatch.setattr(http, "get", lambda url, **k: seen.append(url) or PUBMED_XML)
+    out = pubmed.search("crispr", limit=5, year_from=2010)
+    assert len(out) == 1 and out[0]["year"] == 2023
+    assert "esearch.fcgi" in seen[0] and "mindate=2010" in seen[0] and "tool=litsurvey" in seen[0]
+    assert "efetch.fcgi" in seen[1] and "40000001%2C40000002" in seen[1]
+
+
+def test_pubmed_search_no_hits(monkeypatch):
+    monkeypatch.setattr(http, "get_json", lambda url, **k: {"esearchresult": {"idlist": []}})
+    monkeypatch.setattr(http, "get", lambda url, **k: pytest.fail("efetch must not run"))
+    assert pubmed.search("nothing at all") == []
+
+
+EPMC = {"resultList": {"result": [
+    {"id": "38199153", "source": "MED", "title": "A PINN  study.", "pubYear": "2024",
+     "journalInfo": {"journal": {"title": "Neural Networks"}}, "doi": "10.5/pinn",
+     "citedByCount": 7, "abstractText": "Hello\nworld",
+     "authorList": {"author": [{"fullName": "Ann Author"}]}},
+    {"id": "PPR1", "source": "PPR", "title": "A preprint", "pubYear": "notayear",
+     "authorString": "Bob Beta, Cid Gamma"}]}}
+
+
+def test_europepmc_parse():
+    a, b = europepmc.parse(EPMC)
+    assert a["title"] == "A PINN study" and a["year"] == 2024 and a["citations"] == 7
+    assert a["venue"] == "Neural Networks" and a["doi"] == "10.5/pinn"
+    assert a["abstract"] == "Hello world" and a["sources"] == ["europepmc"]
+    assert a["url"] == "https://europepmc.org/article/MED/38199153"
+    assert b["year"] is None and b["venue"] == "preprint"          # bad year, source label
+    assert b["authors"] == ["Bob Beta", "Cid Gamma"]               # authorString fallback
+
+
+def test_europepmc_year_filter_is_a_query_clause(monkeypatch):
+    seen = {}
+
+    def fake(url, **k):
+        seen["url"] = url
+        return EPMC
+    monkeypatch.setattr(http, "get_json", fake)
+    europepmc.search("pinn", limit=1, year_from=2022)
+    assert "FIRST_PDATE" in seen["url"] and "2022-01-01" in seen["url"]
+    assert "sort" not in seen["url"]        # relevance order is what rank fusion needs
+
+
+PUBMED_BOOK_XML = b"""<?xml version="1.0"?>
+<PubmedArticleSet>
+<PubmedArticle><MedlineCitation><PMID>1</PMID><Article>
+<Journal><ISOAbbreviation>J Test</ISOAbbreviation>
+<JournalIssue><PubDate><Year>2020</Year></PubDate></JournalIssue></Journal>
+<ArticleTitle>A journal article</ArticleTitle></Article></MedlineCitation></PubmedArticle>
+<PubmedBookArticle><BookDocument><PMID>20301295</PMID>
+<ArticleIdList><ArticleId IdType="bookaccession">NBK1116</ArticleId>
+<ArticleId IdType="doi">10.5/book</ArticleId></ArticleIdList>
+<Book><Publisher><PublisherName>University of Washington</PublisherName></Publisher>
+<BookTitle>GeneReviews<sup>R</sup></BookTitle><PubDate><Year>1993</Year></PubDate>
+<AuthorList><Author><LastName>Adam</LastName><ForeName>Margaret P</ForeName></Author></AuthorList></Book>
+<Abstract><AbstractText>A book abstract.</AbstractText></Abstract>
+</BookDocument></PubmedBookArticle>
+</PubmedArticleSet>"""
+
+
+def test_pubmed_parses_book_records_too():
+    """efetch mixes PubmedArticle and PubmedBookArticle; dropping the second
+    silently loses records that esearch already counted."""
+    article, book = pubmed.parse(PUBMED_BOOK_XML)
+    assert article["title"] == "A journal article" and article["year"] == 2020
+    assert book["title"] == "GeneReviewsR" and book["year"] == 1993
+    assert book["venue"] == "GeneReviewsR" and book["doi"] == "10.5/book"
+    assert book["authors"] == ["Margaret P Adam"]
+    assert book["abstract"] == "A book abstract."
+    assert book["url"] == "https://pubmed.ncbi.nlm.nih.gov/20301295/"
+
+
+def test_europepmc_blank_author_entries_fall_back_to_the_author_string():
+    out = europepmc.parse({"resultList": {"result": [
+        {"id": "1", "source": "MED", "title": "T", "pubYear": "2024",
+         "authorList": {"author": [{}, {"fullName": "  "}]},
+         "authorString": "Ann Author, Bob Beta"}]}})
+    assert out[0]["authors"] == ["Ann Author", "Bob Beta"]

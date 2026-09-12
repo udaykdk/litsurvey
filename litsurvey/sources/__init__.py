@@ -2,7 +2,7 @@
 import sys
 
 from .. import papers
-from . import arxiv, crossref, iacr, openalex, semanticscholar
+from . import arxiv, crossref, europepmc, iacr, openalex, pubmed, semanticscholar
 
 # name -> (search function, rank-fusion weight). The three big indexes carry full
 # weight; single-portal sources carry half so a niche preprint does not outrank
@@ -11,12 +11,15 @@ SOURCES = {
     "openalex": (openalex.search, 1.0),
     "s2": (semanticscholar.search, 1.0),
     "arxiv": (arxiv.search, 1.0),
+    "pubmed": (pubmed.search, 1.0),       # the authority for the life sciences
     "techrxiv": (crossref.portal("techrxiv"), 0.5),
     "researchsquare": (crossref.portal("researchsquare"), 0.5),
     "iacr": (iacr.search, 0.5),
-    "crossref": (crossref.search, 0.7),   # all DOI-registered works; off by default (overlaps OpenAlex)
+    # off by default, each because it largely repeats a source already listed
+    "europepmc": (europepmc.search, 0.7),  # PubMed's ground plus bioRxiv/medRxiv preprints
+    "crossref": (crossref.search, 0.7),    # all DOI-registered works; overlaps OpenAlex
 }
-DEFAULT_SOURCES = ("openalex", "s2", "arxiv", "techrxiv", "researchsquare", "iacr")
+DEFAULT_SOURCES = ("openalex", "s2", "arxiv", "pubmed", "techrxiv", "researchsquare", "iacr")
 
 
 def run_search(query, limit=20, year_from=None, sources=None):

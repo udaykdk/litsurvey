@@ -28,7 +28,7 @@ key. `litsurvey doctor` prints what will be used.
 Set a permanent choice with `litsurvey init`, or write the config:
 
 ```json
-{ "backend": "cli", "cli_tool": "claude" }
+{ "backend": "cli", "cli_tool": "claude", "cli_model": "opus", "cli_effort": "high" }
 { "backend": "ollama", "model": "qwen3:30b" }
 ```
 
@@ -58,10 +58,78 @@ or `custom`. The commands used are:
 
 | Tool | Command litsurvey runs |
 |---|---|
-| claude | `claude -p --output-format text --allowedTools "Bash(litsurvey:*)"`, prompt on stdin |
-| codex | `codex exec --full-auto "<prompt>"` |
+| claude | `claude -p --model <model> --effort <effort> --output-format text --allowedTools "Bash(litsurvey:*)"`, prompt on stdin |
+| codex | `codex exec -c model_reasoning_effort=<effort> --skip-git-repo-check --sandbox workspace-write --add-dir ~/.litsurvey -c sandbox_workspace_write.network_access=true -o <tmpfile> "<prompt>"` |
 | gemini | `gemini --yolo -o text -p "<prompt>"` |
 | custom | whatever `cli_command` in the config says; `{prompt}` is substituted, otherwise the prompt is passed on stdin |
+
+Codex runs in an empty temporary directory (`-C`), created per run and
+deleted afterwards, so `workspace-write` gives it a scratch area and
+`~/.litsurvey` rather than whatever directory you happened to start from.
+It is still a shell-capable agent reading titles and abstracts fetched from
+the internet, and codex has no per-command allow-list of the kind Claude Code
+takes, so treat it as you would any agent with a shell: a paper abstract
+containing instructions is text the model will read. The local backend
+(option 2) avoids this entirely.
+
+The codex flags are not optional. `codex exec` sandboxes the commands
+it runs, and without them it has no network (so every `litsurvey` call
+returns nothing while codex still exits 0 and writes a confident, empty
+report), refuses to start outside a git repository, and cannot write the run
+history under `~/.litsurvey`. `-o <tmpfile>` makes codex write its final
+message to a file; litsurvey reads that instead of stdout, which also
+carries progress and tool-call chatter.
+
+### Which model and how much effort
+
+Left alone, each tool uses whatever it is configured to use — its own
+shipped default, or whatever you set in `~/.claude/settings.json` or
+`~/.codex/config.toml`. People who have turned those up for coding often have
+the top model at the highest effort (`model_reasoning_effort = "max"`, say).
+For a literature search — mostly running queries and summarising what comes
+back — that spends a large part of a subscription's quota and a lot of
+wall-clock time.
+
+So litsurvey picks instead: **one model below the best, and an effort level in
+the middle of the range.** This is a cost-and-time policy, not a claim that the
+smaller setting answers as well; nothing here measures answer quality. If you
+would rather have the top model, set `cli_model` to `-` and litsurvey will
+pass no model flag at all. `litsurvey init` works this out by asking the
+installed binary what it supports, rather than by hard-coding a table that
+goes stale when the vendor ships a new model. How much can actually be
+discovered differs by tool:
+
+| Tool | Models | Effort levels |
+|---|---|---|
+| claude | read from `claude --help` (today: fable, opus, sonnet) → **opus** | read from `claude --help` (low, medium, high, xhigh, max) → **high** |
+| codex | not discoverable; `codex --help` names no models, so codex keeps its own default | not discoverable either, so litsurvey uses a known ladder (minimal … max) → **high** |
+| gemini | not discoverable; gemini keeps its own default | gemini has no effort setting |
+
+Two caveats on the poll. The capability *ranking* is hard-coded, because a
+`--help` text lists names but never says which is strongest; and those names
+are examples the tool prints, not a guaranteed roster, so litsurvey only ever
+proposes a model the installed build itself mentioned. Effort levels come from
+`--help` when it enumerates them, and otherwise from a known ladder in the
+source, because a tool can accept an effort setting without documenting its
+values. Anything that cannot be established at all means litsurvey passes no
+flag and the tool keeps its own setting.
+
+The model and effort are remembered against the tool they were chosen for. A
+model name means nothing to a different vendor's CLI, so switching `cli_tool`
+re-runs the poll rather than sending, say, `opus` to codex.
+
+`litsurvey doctor` prints what will be used:
+
+```console
+agent default: backend=cli model=codex (subscription CLI, text goes to the vendor)
+  codex run as: model=(tool default) effort=high  [set cli_model / cli_effort in the config, or '-' to leave the tool alone]
+```
+
+To override, run `litsurvey init` again, or set `cli_model` and `cli_effort`
+in `~/.litsurvey/config.json` (or `LITSURVEY_CLI_MODEL` / `LITSURVEY_CLI_EFFORT`
+in the environment). The value `"-"` means "pass nothing, let the tool decide",
+which is what you want if you would rather have the best model than the
+cheaper one.
 
 Things to know:
 
@@ -78,14 +146,14 @@ Things to know:
 - There is no progress display while the agent works; a run typically takes
   one to five minutes. The `[agent]` line at the start says which tool is
   running.
-- Codex CLI's sandbox blocks network access by default in some
-  configurations, which stops litsurvey's API calls. If runs fail with
-  network errors, allow network in your Codex config, or use the `custom`
-  tool with the flags your version needs.
-- The Claude Code path has been run end to end by the author (a real
-  novelty assessment with a full search log). The Codex and Gemini commands
-  follow those tools' documented flags but have not been run; reports
-  welcome.
+- Codex CLI's flags move between releases. The command above is what works
+  on codex-cli 0.153.4; `--full-auto`, which earlier versions of litsurvey
+  used, no longer exists and makes `codex exec` fail outright. If your codex
+  rejects a flag, use the `custom` tool with a command line your version
+  accepts.
+- The Claude Code and Codex CLI paths have both been run end to end against
+  the real binaries. The Gemini command follows that tool's documented flags
+  but has not been run; reports welcome.
 - `--rounds` becomes a command budget for the agent (about three commands
   per round).
 

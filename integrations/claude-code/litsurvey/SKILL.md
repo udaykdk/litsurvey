@@ -1,6 +1,6 @@
 ---
 name: litsurvey
-description: Search scientific literature (OpenAlex, Semantic Scholar, arXiv, TechRxiv, Research Square, IACR ePrint), walk citations, find open-access copies, export BibTeX, or run a local-LLM novelty assessment. Use whenever the user asks to find papers, check prior art or the state of the art, assess novelty of a claim, list what cites a paper, get a reading list, or says "litsurvey". Prefer this over generic web search for scholarly questions.
+description: Search scientific literature (OpenAlex, Semantic Scholar, arXiv, PubMed, TechRxiv, Research Square, IACR ePrint; Europe PMC and Crossref on request), walk citations, find open-access copies, export BibTeX, or run a local-LLM novelty assessment. Use whenever the user asks to find papers, check prior art or the state of the art, assess novelty of a claim, list what cites a paper, get a reading list, or says "litsurvey". Prefer this over generic web search for scholarly questions.
 ---
 
 # litsurvey: scholarly search and novelty assessment
@@ -13,6 +13,7 @@ API keys and never print that file.
 
 ```bash
 litsurvey search "keyword query" -n 15 [--year-from 2022] [--sort citations|year] [--abstracts] [--json] [--out refs.bib]
+                                            # [--sources openalex,s2,arxiv] to go faster, [--sources ...,europepmc,crossref] to go wider
 litsurvey paper   <id|title>    # id: S2 hash, DOI:10..., or ARXIV:2404.19756; a title gives a numbered candidate list (exit 2): rerun with --pick N
 litsurvey cites   <id> [-n 20]  # forward snowball: who cites it
 litsurvey refs    <id> [-n 20]  # backward snowball: what it cites

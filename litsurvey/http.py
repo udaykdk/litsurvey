@@ -21,6 +21,8 @@ HOST_INTERVAL = {
     "api.unpaywall.org": 0.2,
     "api.crossref.org": 0.2,
     "eprint.iacr.org": 2.0,           # no API; be gentle with their search page
+    "eutils.ncbi.nlm.nih.gov": 0.35,  # NCBI allows 3 requests/second without a key
+    "www.ebi.ac.uk": 0.2,
 }
 _last_call = {}
 DEBUG = False
@@ -33,6 +35,8 @@ FRIENDLY = {
     "ar5iv.labs.arxiv.org": "arXiv (ar5iv)",
     "api.crossref.org": "Crossref (TechRxiv / Research Square)",
     "eprint.iacr.org": "IACR ePrint",
+    "eutils.ncbi.nlm.nih.gov": "PubMed",
+    "www.ebi.ac.uk": "Europe PMC",
     "api.unpaywall.org": "Unpaywall",
     "api.openai.com": "OpenAI",
     "openrouter.ai": "OpenRouter",

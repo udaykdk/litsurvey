@@ -85,7 +85,7 @@
       <div class="module search">
       <div class="grp">Search &amp; lookup (no LLM involved)</div>
       <div class="modes">
-        <label><input type="radio" name="mode" value="search" checked><span>Search<small>keyword search across six indexes (OpenAlex, Semantic Scholar, arXiv, preprint portals)</small></span></label>
+        <label><input type="radio" name="mode" value="search" checked><span>Search<small>keyword search across seven indexes (OpenAlex, Semantic Scholar, arXiv, PubMed, preprint portals)</small></span></label>
         <label><input type="radio" name="mode" value="paper"><span>Paper<small>one paper's full record: abstract, DOI, ids, BibTeX</small></span></label>
         <label><input type="radio" name="mode" value="cites"><span>Cites<small>papers that cite a given paper</small></span></label>
         <label><input type="radio" name="mode" value="refs"><span>Refs<small>papers a given paper cites</small></span></label>
@@ -192,7 +192,7 @@ function refreshForm(){
   $("model").placeholder = llmLocal() ? ((CONFIG.ollama_models||[])[0] || "e.g. qwen3:30b") : ($("backend").value==="anthropic" ? "e.g. claude-sonnet-5" : (isOR ? "required, e.g. anthropic/claude-sonnet-4.5" : "e.g. gpt-5"));
   const ps = $("privacySearch");
   ps.textContent = m==="oa" ? "No LLM involved. Only the DOI is sent to Unpaywall."
-                 : "No LLM involved. Only this query or ID is sent to the scholarly APIs (OpenAlex, Semantic Scholar, arXiv, Crossref, IACR ePrint).";
+                 : "No LLM involved. Only this query or ID is sent to the scholarly APIs (OpenAlex, Semantic Scholar, arXiv, PubMed, Crossref, IACR ePrint).";
   const p = $("privacy");
   if (!isAgent) { p.className="note info"; p.textContent = "Select Novelty or Research above to use an LLM; then choose where it runs here."; checkUrl(); return; }
   if (choice === "cli") {

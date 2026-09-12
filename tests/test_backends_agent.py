@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 
 import pytest
@@ -184,3 +185,240 @@ def test_split_command_keeps_windows_paths(monkeypatch):
         [r"C:\Python\python.exe", "-c", "import sys; sys.exit(3)", "{prompt}"]
     monkeypatch.setattr(backends.os, "name", "posix")
     assert backends.split_command('/usr/bin/python3 -c "import sys"') == ["/usr/bin/python3", "-c", "import sys"]
+
+
+CLAUDE_HELP = """Usage: claude [options] [command] [prompt]
+
+Options:
+  --effort <level>                      Effort level for the current session
+                                        (low, medium, high, xhigh, max)
+  --model <model>                       Model for the current session. Provide
+                                        an alias for the latest model (e.g.
+                                        'fable', 'opus', or 'sonnet') or a
+                                        model's full name (e.g.
+                                        'claude-fable-5').
+  -n, --name <name>                     Set a display name for this session
+"""
+
+CODEX_HELP = """Usage: codex exec [OPTIONS] [PROMPT]
+
+Options:
+  -m, --model <MODEL>
+          Model the agent should use
+
+  -s, --sandbox <SANDBOX_MODE>
+          [possible values: read-only, workspace-write, danger-full-access]
+"""
+
+
+def _help(monkeypatch, text):
+    monkeypatch.setattr(backends, "_HELP_CACHE", {})
+    monkeypatch.setattr(backends, "cli_help", lambda tool, timeout=20: text)
+
+
+def test_help_block_stops_at_the_next_option():
+    block = backends.help_block(CLAUDE_HELP, "--model")
+    assert "fable" in block and "sonnet" in block
+    assert "display name" not in block          # did not run into the next option
+    assert "Effort level" not in block          # did not run into the previous one
+
+
+def test_parse_choices():
+    assert backends.parse_choices(backends.help_block(CLAUDE_HELP, "--effort")) == \
+        ["low", "medium", "high", "xhigh", "max"]
+    assert backends.parse_choices(backends.help_block(CODEX_HELP, "--sandbox")) == \
+        ["read-only", "workspace-write", "danger-full-access"]
+    assert backends.parse_choices("no list here (single)") == []
+
+
+def test_probe_claude_picks_second_model_and_middle_effort(monkeypatch):
+    _help(monkeypatch, CLAUDE_HELP)
+    got = backends.probe("claude")
+    assert got["models"] == ["fable", "opus", "sonnet"]   # haiku is unknown to this build
+    assert got["model"] == "opus"                         # one below the best
+    assert got["efforts"] == ["low", "medium", "high", "xhigh", "max"]
+    assert got["effort"] == "high"                        # middle of the range
+
+
+def test_probe_codex_falls_back_to_the_known_ladder(monkeypatch):
+    _help(monkeypatch, CODEX_HELP)
+    got = backends.probe("codex")
+    assert got["model"] == ""                  # codex does not advertise its models
+    assert got["effort"] == "high" and "none" not in got["efforts"]
+
+
+def test_probe_survives_a_tool_that_says_nothing(monkeypatch):
+    _help(monkeypatch, "")
+    assert backends.probe("gemini") == {"model": "", "effort": "", "models": [], "efforts": []}
+    assert backends.probe("claude")["model"] == ""        # no help text, no flag
+
+
+def test_cli_command_inserts_model_and_effort(monkeypatch):
+    _help(monkeypatch, CLAUDE_HELP)
+    monkeypatch.setattr(backends.shutil, "which", lambda t: "/usr/bin/" + t)
+    for k in ("cli_model", "cli_effort"):
+        monkeypatch.setitem(backends.CFG, k, "")
+    argv, use_stdin = backends.cli_command("claude")
+    assert use_stdin is True
+    assert argv[:6] == ["claude", "-p", "--model", "opus", "--effort", "high"]
+    assert "--allowedTools" in argv
+
+
+def test_config_overrides_and_dash_means_tool_default(monkeypatch):
+    _help(monkeypatch, CLAUDE_HELP)
+    monkeypatch.setattr(backends.shutil, "which", lambda t: "/usr/bin/" + t)
+    monkeypatch.setitem(backends.CFG, "cli_model", "sonnet")
+    monkeypatch.setitem(backends.CFG, "cli_effort", "low")
+    assert backends.cli_defaults("claude") == ("sonnet", "low")
+    assert backends.cli_command("claude")[0][2:6] == ["--model", "sonnet", "--effort", "low"]
+    monkeypatch.setitem(backends.CFG, "cli_model", "-")
+    monkeypatch.setitem(backends.CFG, "cli_effort", "-")
+    assert backends.cli_defaults("claude") == ("", "")
+    assert "--model" not in backends.cli_command("claude")[0]
+
+
+def test_codex_argv_keeps_the_sandbox_escapes(monkeypatch):
+    """codex exec has no network, no history directory and refuses to start
+    outside a git repository unless these are passed."""
+    _help(monkeypatch, CODEX_HELP)
+    monkeypatch.setattr(backends.shutil, "which", lambda t: "/usr/bin/" + t)
+    for k in ("cli_model", "cli_effort"):
+        monkeypatch.setitem(backends.CFG, k, "")
+    argv, use_stdin = backends.cli_command("codex")
+    assert use_stdin is False and "--full-auto" not in argv
+    assert "--skip-git-repo-check" in argv
+    assert argv[argv.index("--sandbox") + 1] == "workspace-write"
+    assert "sandbox_workspace_write.network_access=true" in argv
+    assert argv[argv.index("--add-dir") + 1] == backends.DATA_DIR
+    assert "{datadir}" not in " ".join(argv)
+    assert "model_reasoning_effort=high" in argv
+
+
+def test_run_cli_prefers_the_output_file_over_stdout(monkeypatch, tmp_path):
+    monkeypatch.setattr(backends, "cli_command",
+                        lambda tool: (["x", "y", "-o", "{outfile}", "{prompt}"], False))
+
+    class Proc:
+        returncode = 0
+        stdout = "progress chatter\ntokens used 123"
+        stderr = ""
+
+    def fake_run(argv, **kw):
+        outfile = argv[argv.index("-o") + 1]
+        assert "{outfile}" not in outfile and argv[-1] == "the task"
+        with open(outfile, "w", encoding="utf-8") as f:
+            f.write("  the real report  ")
+        return Proc()
+    monkeypatch.setattr(backends.subprocess, "run", fake_run)
+    assert backends.run_cli("codex", "the task") == "the real report"
+
+
+def test_run_cli_falls_back_to_stdout_when_the_file_is_empty(monkeypatch):
+    monkeypatch.setattr(backends, "cli_command",
+                        lambda tool: (["x", "y", "-o", "{outfile}", "{prompt}"], False))
+
+    class Proc:
+        returncode = 0
+        stdout = "only on stdout"
+        stderr = ""
+    monkeypatch.setattr(backends.subprocess, "run", lambda argv, **kw: Proc())
+    assert backends.run_cli("codex", "t") == "only on stdout"
+
+
+def test_run_cli_cleans_up_the_output_file_when_the_tool_hangs(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(backends, "cli_command",
+                        lambda tool: (["x", "y", "-o", "{outfile}", "{prompt}"], False))
+
+    def hang(argv, **kw):
+        seen["outfile"] = argv[argv.index("-o") + 1]
+        raise backends.subprocess.TimeoutExpired(argv, 1)
+    monkeypatch.setattr(backends.subprocess, "run", hang)
+    with pytest.raises(RuntimeError, match="did not finish"):
+        backends.run_cli("codex", "t", timeout=1)
+    assert not os.path.exists(seen["outfile"])          # no temp file left behind
+
+
+def test_run_cli_cleans_up_when_the_tool_is_missing(monkeypatch):
+    seen = {}
+
+    def missing(argv, **kw):
+        seen["outfile"] = argv[argv.index("-o") + 1]
+        raise FileNotFoundError()
+    monkeypatch.setattr(backends, "cli_command",
+                        lambda tool: (["x", "y", "-o", "{outfile}", "{prompt}"], False))
+    monkeypatch.setattr(backends.subprocess, "run", missing)
+    with pytest.raises(RuntimeError, match="could not start"):
+        backends.run_cli("codex", "t")
+    assert not os.path.exists(seen["outfile"])
+
+
+def test_custom_command_also_gets_the_data_directory(monkeypatch):
+    monkeypatch.setitem(backends.CFG, "cli_command", "mytool --hist {datadir} -p {prompt}")
+    argv, use_stdin = backends.cli_command("custom")
+    assert use_stdin is False
+    assert argv[argv.index("--hist") + 1] == backends.DATA_DIR
+
+
+def test_a_stored_model_does_not_leak_to_another_tool(monkeypatch):
+    """"opus" means nothing to codex, and codex rejects an unknown model."""
+    _help(monkeypatch, CODEX_HELP)
+    monkeypatch.setattr(backends.shutil, "which", lambda t: "/usr/bin/" + t)
+    monkeypatch.delenv("LITSURVEY_CLI_MODEL", raising=False)
+    monkeypatch.delenv("LITSURVEY_CLI_EFFORT", raising=False)
+    monkeypatch.setitem(backends.CFG, "cli_tool", "claude")     # chosen for claude
+    monkeypatch.setitem(backends.CFG, "cli_model", "opus")
+    monkeypatch.setitem(backends.CFG, "cli_effort", "xhigh")
+    assert backends.cli_defaults("codex") == ("", "high")       # probed, not inherited
+    assert "opus" not in backends.cli_command("codex")[0]
+    assert backends.cli_defaults("claude") == ("opus", "xhigh")  # its owner still gets it
+
+
+def test_environment_overrides_apply_to_any_tool(monkeypatch):
+    _help(monkeypatch, CODEX_HELP)
+    monkeypatch.setattr(backends.shutil, "which", lambda t: "/usr/bin/" + t)
+    monkeypatch.setitem(backends.CFG, "cli_tool", "claude")
+    monkeypatch.setitem(backends.CFG, "cli_model", "opus")
+    monkeypatch.setenv("LITSURVEY_CLI_MODEL", "gpt-5.6-sol")
+    monkeypatch.setenv("LITSURVEY_CLI_EFFORT", "low")
+    assert backends.cli_defaults("codex") == ("gpt-5.6-sol", "low")
+
+
+def test_a_prompt_containing_outfile_is_not_rewritten(monkeypatch):
+    monkeypatch.setattr(backends, "cli_command",
+                        lambda tool: (["x", "y", "-o", "{outfile}", "{prompt}"], False))
+    seen = {}
+
+    class Proc:
+        returncode = 0
+        stdout = "ok"
+        stderr = ""
+
+    def fake_run(argv, **kw):
+        seen["argv"] = list(argv)
+        return Proc()
+    monkeypatch.setattr(backends.subprocess, "run", fake_run)
+    backends.run_cli("codex", "is novelty claimed for {outfile} designs?")
+    assert seen["argv"][-1] == "is novelty claimed for {outfile} designs?"
+    assert seen["argv"][3] != seen["argv"][-1]        # -o got a real path
+
+
+def test_codex_runs_in_a_throwaway_working_directory(monkeypatch):
+    _help(monkeypatch, CODEX_HELP)
+    monkeypatch.setattr(backends.shutil, "which", lambda t: "/usr/bin/" + t)
+    for k in ("cli_model", "cli_effort", "cli_tool"):
+        monkeypatch.setitem(backends.CFG, k, "")
+    seen = {}
+
+    class Proc:
+        returncode = 0
+        stdout = "report"
+        stderr = ""
+
+    def fake_run(argv, **kw):
+        seen["workdir"] = argv[argv.index("-C") + 1]
+        assert os.path.isdir(seen["workdir"]) and not os.listdir(seen["workdir"])
+        return Proc()
+    monkeypatch.setattr(backends.subprocess, "run", fake_run)
+    backends.run_cli("codex", "task")
+    assert not os.path.exists(seen["workdir"])       # removed afterwards

@@ -13,6 +13,15 @@ typed, a keyword query, a paper ID or a DOI, to the public scholarly APIs and
 prints what comes back. The exposure is the same as typing that query into
 the website of OpenAlex, Semantic Scholar or arXiv yourself.
 
+The hosts contacted by a default search are `api.openalex.org`,
+`api.semanticscholar.org`, `export.arxiv.org`, `eutils.ncbi.nlm.nih.gov`
+(PubMed), `api.crossref.org` (TechRxiv and Research Square) and
+`eprint.iacr.org`; `--sources europepmc` adds `www.ebi.ac.uk` and `oa` uses
+`api.unpaywall.org`. Each sees the query and your IP address, and — if you
+set `openalex_mailto` — your email address, which OpenAlex, Crossref and
+NCBI use to identify polite callers. None of them is told what you are
+working on beyond the query itself.
+
 **Agent commands** (`novelty`, `research`) use a language model to plan
 queries, read the results, and write a report. Where that model runs decides
 what leaves the machine.

@@ -11,6 +11,8 @@ Keys (all optional):
   anthropic_api_key
   cli_tool          subscription CLI for the "cli" backend: claude | codex | gemini | custom
   cli_command       custom command line for cli_tool=custom; {prompt} placeholder or prompt on stdin
+  cli_model         model the subscription CLI should use; "-" means the tool's own default
+  cli_effort        reasoning effort for the subscription CLI; "-" means the tool's own default
 """
 import json
 import os
@@ -30,6 +32,8 @@ ENV_MAP = {
     "anthropic_api_key": ("ANTHROPIC_API_KEY",),
     "cli_tool": ("LITSURVEY_CLI_TOOL",),
     "cli_command": ("LITSURVEY_CLI_COMMAND",),
+    "cli_model": ("LITSURVEY_CLI_MODEL",),
+    "cli_effort": ("LITSURVEY_CLI_EFFORT",),
 }
 
 DEFAULTS = {
@@ -43,6 +47,8 @@ DEFAULTS = {
     "anthropic_api_key": "",
     "cli_tool": "",
     "cli_command": "",
+    "cli_model": "",
+    "cli_effort": "",
 }
 
 

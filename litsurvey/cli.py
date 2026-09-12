@@ -138,6 +138,33 @@ def cmd_history(args):
         print(f"deleted {args.run_id}")
 
 
+def _init_cli_model(tool, cur, vals):
+    """Ask the installed CLI what models and effort levels it supports, and settle
+    on a deliberate default. Left alone, these tools run at their top model and
+    highest reasoning effort, which for a literature search burns a lot of the
+    subscription's quota and time for no better answer. The choice is one model
+    below the best and an effort level in the middle of the range."""
+    print(f"\nasking {tool} what it supports...")
+    found = backends.probe(tool)
+    if found["models"]:
+        print(f"  models it names : {', '.join(found['models'])} (best first)")
+    else:
+        print(f"  models it names : none listed in `{tool} --help`; its own default will be used")
+    if found["efforts"]:
+        print(f"  effort levels   : {', '.join(found['efforts'])}")
+    else:
+        print(f"  effort levels   : none ({tool} takes no effort setting)")
+    print(f"  litsurvey picks : model={found['model'] or '(tool default)'} "
+          f"effort={found['effort'] or '(tool default)'}")
+    print("  Enter accepts this. Type a value to override, or '-' to leave the tool at its own default.")
+    if found["models"] or cur["cli_model"]:
+        m = input(f"  model [{cur['cli_model'] or found['model'] or 'tool default'}]: ").strip()
+        vals["cli_model"] = m or cur["cli_model"] or found["model"] or "-"
+    if found["efforts"] or cur["cli_effort"]:
+        e = input(f"  effort [{cur['cli_effort'] or found['effort'] or 'tool default'}]: ").strip()
+        vals["cli_effort"] = e or cur["cli_effort"] or found["effort"] or "-"
+
+
 def cmd_init(args):
     print("litsurvey setup. Press Enter to keep a value.\n")
     cur = config.load()
@@ -162,10 +189,13 @@ def cmd_init(args):
         tool = input(f"CLI tool (claude / codex / gemini / custom) [{cur['cli_tool'] or (found[0] if found else 'claude')}]: ").strip().lower()
         if tool:
             vals["cli_tool"] = tool
-        if (tool or cur["cli_tool"]) == "custom":
+        tool = tool or cur["cli_tool"] or (found[0] if found else "claude")
+        if tool == "custom":
             cmd = input("custom command (use {prompt} for the prompt, or it is passed on stdin): ").strip()
             if cmd:
                 vals["cli_command"] = cmd
+        else:
+            _init_cli_model(tool, cur, vals)
     else:
         model = input(f"default model name [{cur['model'] or 'auto'}]: ").strip()
         if model:
@@ -188,7 +218,7 @@ def cmd_init(args):
 
 
 def cmd_doctor(args):
-    from .sources import arxiv, crossref, iacr, openalex, semanticscholar
+    from .sources import arxiv, crossref, iacr, openalex, pubmed, semanticscholar
     cfg = config.load()
     ok, warnings = True, []
     print(f"litsurvey {__version__}, python {sys.version.split()[0]}")
@@ -203,6 +233,7 @@ def cmd_doctor(args):
     for name, fn, q in (("openalex", openalex.search, "attention transformer"),
                         ("semanticscholar", semanticscholar.search, "attention transformer"),
                         ("arxiv", arxiv.search, "attention transformer"),
+                        ("pubmed", pubmed.search, "crispr off-target"),
                         ("techrxiv", crossref.portal("techrxiv"), "neural network"),
                         ("researchsquare", crossref.portal("researchsquare"), "neural network"),
                         ("iacr", iacr.search, "lattice signature")):
@@ -236,6 +267,10 @@ def cmd_doctor(args):
         where = "local" if local else ("subscription CLI, text goes to the vendor" if be == "cli" else "CLOUD")
         print(f"agent default: backend={be} model={model} ({where})")
         agent_line = f"novelty/research will use {be} {'tool' if be == 'cli' else 'model'} {model} ({where})"
+        if be == "cli":
+            cm, ce = backends.cli_defaults(model)
+            print(f"  {model} run as: model={cm or '(tool default)'} effort={ce or '(tool default)'}"
+                  f"  [set cli_model / cli_effort in the config, or '-' to leave the tool alone]")
         if not cfg["model"] and be == "ollama":
             agent_line += "; set a different default with `litsurvey init`"
     except Exception as e:  # noqa: BLE001
@@ -273,8 +308,9 @@ def build_parser():
     p = sub.add_parser("search", help="keyword search across OpenAlex + Semantic Scholar + arXiv")
     p.add_argument("text", metavar="QUERY")
     p.add_argument("--year-from", type=int, metavar="YEAR")
-    p.add_argument("--sources", help="comma list from openalex,s2,arxiv,techrxiv,researchsquare,iacr,crossref "
-                                     "(default: all except crossref)")
+    p.add_argument("--sources", help="comma list from openalex,s2,arxiv,pubmed,techrxiv,researchsquare,"
+                                     "iacr,europepmc,crossref (default: all except europepmc and crossref, "
+                                     "which repeat sources already in the list)")
     p.add_argument("--scholar", action="store_true", help="also print a Google Scholar URL for the query")
     _add_list_opts(p)
     p.set_defaults(fn=cmd_list_mode("search"))

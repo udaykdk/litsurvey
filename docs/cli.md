@@ -32,17 +32,39 @@ not.
 litsurvey search "QUERY" [--year-from YEAR] [--sources openalex,s2,arxiv] [--scholar] [list options]
 ```
 
-Queries OpenAlex, Semantic Scholar, arXiv, TechRxiv, Research Square and
-the IACR ePrint archive, de-duplicates by DOI, arXiv ID or title, and merges
-the rankings with weighted reciprocal rank fusion (the three big indexes
+Queries OpenAlex, Semantic Scholar, arXiv, PubMed, TechRxiv, Research Square
+and the IACR ePrint archive, de-duplicates by DOI, arXiv ID or title, and
+merges the rankings with weighted reciprocal rank fusion (the big indexes
 carry full weight, the single-portal sources half). A paper found by more
 than one source ranks higher and shows `[openalex+s2]`. `--scholar` prints
 a Google Scholar URL for the same query, for a manual comparison.
-`--sources openalex,s2,arxiv,techrxiv,researchsquare,iacr,crossref`
-restricts or extends the set; `crossref` (every DOI-registered work) is off
-by default because it largely overlaps OpenAlex. IACR results carry no DOI
-or Semantic Scholar id, so they appear in searches but cannot be used with
-`cites`, `refs` or `related`.
+
+`--sources` restricts or extends the set:
+
+| Name | What it is | Default |
+|---|---|---|
+| `openalex` | about 250 million works, all fields | yes |
+| `s2` | Semantic Scholar, about 220 million works | yes |
+| `arxiv` | preprints in physics, maths, CS and related fields | yes |
+| `pubmed` | about 38 million biomedical records, via the NCBI E-utilities | yes |
+| `techrxiv` | TechRxiv preprints, via their Crossref DOI prefix | yes |
+| `researchsquare` | Research Square preprints, same route | yes |
+| `iacr` | IACR Cryptology ePrint Archive | yes |
+| `europepmc` | Europe PMC: PubMed's ground plus bioRxiv/medRxiv, with citation counts | no |
+| `crossref` | every DOI-registered work | no |
+
+The last two are off by default because each largely repeats a source
+already in the list. Restricting the set is also the way to make a search
+faster: `--sources openalex,s2,arxiv` is the quick physics-and-engineering
+set, and a full default run takes roughly ten to twenty seconds because the
+sources are queried one after another at the rate limits they ask for.
+
+PubMed needs two calls per search (one for the matching record ids, one for
+the records themselves) and so is a little slower than the others. IACR
+results carry no DOI or Semantic Scholar id, so they appear in searches but
+cannot be used with `cites`, `refs` or `related`; DBLP results carry no
+citation counts, which is one reason DBLP is not a source here — the other
+is that its API is behind a bot wall.
 
 ```console
 $ litsurvey search "physics informed neural networks inverse problems" -n 2 --year-from 2022
@@ -170,10 +192,17 @@ litsurvey init      # asks for the Semantic Scholar key, your email, and the LLM
 litsurvey doctor    # checks the search sources and detects LLM backends; paste its output into bug reports
 ```
 
+When you choose the `cli` backend, `init` also asks the installed
+command-line agent which models and effort levels it supports, and proposes
+one model below the best at an effort level in the middle of the range —
+these tools otherwise run at their maximum, which is more model and more
+thinking time than a literature search needs. See
+[llm-integration.md](llm-integration.md).
+
 Neither command is required. `init` is the convenient way to store the
 key; `doctor` is a diagnostic. Run `doctor` once after installing, to
 confirm the key and any LLM backend are seen, and again whenever a command
-fails. It makes one small test query to each of the six search sources,
+fails. It makes one small test query to each of the seven default search sources,
 detects Ollama and any subscription CLI on PATH, and reports whether cloud
 keys are configured. It does not query Unpaywall and does not make an LLM
 call. It ends with a `RESULT:` verdict followed by one advisory line:
@@ -185,13 +214,14 @@ retry succeeded.
 
 ```console
 $ litsurvey doctor
-litsurvey 1.0.0, python 3.12.4
+litsurvey 1.0.1, python 3.12.4
 config       : /Users/me/.litsurvey/config.json
 S2 API key   : set (s2k-…)
 email        : me@university.edu
 openalex      : OK (2 results)
 semanticscholar: OK (2 results)
 arxiv         : OK (2 results)
+pubmed        : OK (2 results)
 techrxiv      : OK (2 results)
 researchsquare: OK (2 results)
 iacr          : OK (2 results)
