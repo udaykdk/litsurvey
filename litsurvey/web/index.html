@@ -102,7 +102,7 @@
       </div>
       <div id="llmloc" class="llmloc off">
         <span class="grp2">Where does the LLM run?</span>
-        <label><input type="radio" name="llmloc" value="cli" disabled><span>Subscription CLI<small>Claude Code, Codex or Gemini CLI, signed in with your Claude Pro, ChatGPT or Google plan. Your text goes to that vendor.</small></span></label>
+        <label><input type="radio" name="llmloc" value="cli" disabled><span>Subscription CLI<small>Claude Code, Codex, Antigravity or Gemini CLI, signed in with your Claude Pro, ChatGPT or Google plan. Your text goes to that vendor.</small></span></label>
         <label><input type="radio" name="llmloc" value="local" checked disabled><span>Local model<small>Ollama on this machine. Nothing leaves it.</small></span></label>
         <label><input type="radio" name="llmloc" value="cloud" disabled><span>Cloud API key<small>OpenAI-compatible or Anthropic API. Your text goes to the provider.</small></span></label>
         <div class="row llmopts">
@@ -200,7 +200,7 @@ function refreshForm(){
     p.className = "note warn";
     p.textContent = tools.length
       ? `Subscription CLI (${tool}): your claim or question and everything the agent reads are sent to that vendor under your subscription. Not for confidential manuscripts. The tool must already be signed in (run it once in a terminal).`
-      : "No subscription CLI found on PATH (claude, codex or gemini). Install one and sign in, then reload this page; or choose Local model.";
+      : "No subscription CLI found on PATH (claude, codex, agy or gemini). Install one and sign in, then reload this page; or choose Local model.";
   } else if (llmLocal()) {
     if (CONFIG.ollama) { p.className="note ok"; p.textContent = "Local model (Ollama). Your text stays on this machine; only the generic keyword queries the model composes are sent to the scholarly APIs."; }
     else { p.className="note warn"; p.textContent = "Ollama is not running or not installed. Start it (or install it from ollama.com and pull a model), then reload this page. Nothing will be sent to any cloud provider."; }
@@ -235,7 +235,7 @@ async function loadConfig(){
   try { CONFIG = await (await fetch("/api/config")).json(); } catch(e){ CONFIG = {}; }
   $("models").innerHTML = (CONFIG.ollama_models||[]).map(m=>`<option value="${esc(m)}">`).join("");
   if (CONFIG.model) $("model").value = CONFIG.model;
-  const LABELS_CLI = {claude:"Claude Code (Claude Pro / Max)", codex:"Codex CLI (ChatGPT)", gemini:"Gemini CLI (Google)", custom:"custom command (config)"};
+  const LABELS_CLI = {claude:"Claude Code (Claude Pro / Max)", codex:"Codex CLI (ChatGPT)", agy:"Antigravity CLI (Google)", gemini:"Gemini CLI (Google)", custom:"custom command (config)"};
   $("clitool").innerHTML = (CONFIG.cli_tools||[]).map(t=>`<option value="${esc(t)}">${esc(LABELS_CLI[t]||t)}</option>`).join("") || `<option value="">none found</option>`;
   if (CONFIG.cli_tool && (CONFIG.cli_tools||[]).includes(CONFIG.cli_tool)) $("clitool").value = CONFIG.cli_tool;
   let choice = null; try { choice = localStorage.getItem("litsurvey.llmloc"); } catch(e){}

@@ -168,7 +168,7 @@ _CLI_MODE_TOOL = {"search": "search_papers", "cites": "get_citations", "refs": "
 
 
 def _run_cli(kind, text, tool, rounds, say):
-    """Delegate the whole task to a subscription CLI agent (Claude Code, Codex, Gemini)."""
+    """Delegate the whole task to a subscription CLI agent (Claude Code, Codex, Antigravity, Gemini)."""
     system, user_tmpl, kind_name = KINDS[kind]
     cli_model, cli_effort = backends.cli_defaults(tool)
     detail = " ".join(filter(None, [f"model={cli_model}" if cli_model else "",

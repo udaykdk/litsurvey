@@ -45,7 +45,7 @@ backend sees **everything**: your input text, the instructions, and every
 search result.
 
 With the `cli` backend the flow is the same but the loop runs inside the
-vendor's agent (Claude Code, Codex, Gemini CLI) rather than inside
+vendor's agent (Claude Code, Codex, Antigravity, Gemini CLI) rather than inside
 litsurvey: the agent is handed the task and calls `litsurvey search`,
 `cites`, `refs` and `related` itself. Its commands are recorded in the
 search log like any other run.
@@ -54,7 +54,7 @@ search log like any other run.
 
 | Backend | Where the model runs | Sees your text? | Recommended for confidential material |
 |---|---|---|---|
-| `cli` (Claude Code, Codex CLI, Gemini CLI under your subscription) | the vendor's servers | yes, over the network, plus every search result the agent reads | no |
+| `cli` (Claude Code, Codex CLI, Antigravity CLI, Gemini CLI under your subscription) | the vendor's servers | yes, over the network, plus every search result the agent reads | no |
 | `ollama` | your own machine | yes, but locally only | yes |
 | `openai` pointed at a local server (LM Studio, vLLM, llama.cpp on `localhost`) | your own machine | yes, locally only | yes |
 | `openai` pointed at a hosted provider (OpenAI, OpenRouter, ...) | the provider's servers | yes, over the network | no |

@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Google Antigravity CLI (`agy`) support** as a subscription CLI backend
+  alongside Claude Code, Codex, and Gemini CLI. Automatically probes reasoning
+  effort from `agy --help` (defaulting to `medium`).
+
 ## [1.1.0] - 2026-09-12
 
 ### Added

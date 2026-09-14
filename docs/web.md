@@ -28,7 +28,7 @@ line when you want to script something or need one of those.
 3. **Options.** Max results and a from-year for searches. For the agent
    modes, a box asks where the LLM runs, with three choices in the order
    most people have them: a subscription command-line agent (Claude Code,
-   Codex CLI, Gemini CLI), a local Ollama model, or a cloud API key. The
+   Codex CLI, Antigravity CLI, Gemini CLI), a local Ollama model, or a cloud API key. The
    box is greyed out until Novelty or Research is selected, and the page
    remembers your last choice. The model box offers the Ollama models it
    can see.

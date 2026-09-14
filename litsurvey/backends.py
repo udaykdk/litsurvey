@@ -69,6 +69,11 @@ CLI_TOOLS = {
               "model_flag": ("-m", "{v}"), "effort_flag": ("-c", "model_reasoning_effort={v}"),
               "models": (),
               "efforts": ("minimal", "low", "medium", "high", "xhigh", "max")},
+    "agy": {"label": "Antigravity CLI (Google account)",
+            "argv": ["agy", "--dangerously-skip-permissions", "--output-format", "text", "-p", "{prompt}"], "stdin": False,
+            "model_flag": ("--model", "{v}"), "effort_flag": ("--effort", "{v}"),
+            "models": (),
+            "efforts": ("low", "medium", "high")},
     "gemini": {"label": "Gemini CLI (Google account)",
                "argv": ["gemini", "--yolo", "-o", "text", "-p", "{prompt}"], "stdin": False,
                "model_flag": ("-m", "{v}"), "effort_flag": None,
@@ -140,12 +145,14 @@ def help_block(text, flag):
 
 
 def parse_choices(block):
-    """Lowercase words from the first comma-separated list inside a help paragraph,
-    e.g. "(low, medium, high, xhigh, max)" or "[possible values: a, b, c]"."""
-    for m in re.finditer(r"[(\[]([^()\[\]]*,[^()\[\]]*)[)\]]", block or ""):
+    """Lowercase words from the first comma- or pipe-separated list inside a help
+    paragraph, e.g. "(low, medium, high, xhigh, max)", "(low|medium|high)" or
+    "[possible values: a, b, c]"."""
+    for m in re.finditer(r"[(\[]([^()\[\]]*[,|][^()\[\]]*)[)\]]", block or ""):
         inner = re.sub(r"^\s*(possible values|choices|values)\s*:\s*", "",
                        m.group(1), flags=re.I)
-        words = [w.strip().strip("'\"") for w in inner.split(",")]
+        delim = "|" if "|" in inner else ","
+        words = [w.strip().strip("'\"") for w in inner.split(delim)]
         words = [w for w in words if re.fullmatch(r"[a-z][a-z0-9_-]{1,30}", w)]
         if len(words) >= 2:
             return words
@@ -313,14 +320,14 @@ def resolve(backend=None, model=None, options=None):
             else:
                 raise RuntimeError(
                     "no LLM backend found. Start Ollama, install a subscription CLI "
-                    "(claude / codex / gemini), or set OPENAI_API_KEY / ANTHROPIC_API_KEY; "
+                    "(claude / codex / agy / gemini), or set OPENAI_API_KEY / ANTHROPIC_API_KEY; "
                     "`litsurvey init` stores a choice.") from None
     if backend not in BACKENDS:
         raise RuntimeError(f"unknown backend {backend!r}; use one of {BACKENDS}")
     if backend == "cli":
         tool = model or CFG["cli_tool"] or (cli_tools_available() or [None])[0]
         if not tool:
-            raise RuntimeError("no subscription CLI found on PATH (claude, codex or gemini)")
+            raise RuntimeError("no subscription CLI found on PATH (claude, codex, agy or gemini)")
         cli_command(tool)   # validates
         return backend, tool
     model = model or CFG["model"]

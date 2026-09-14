@@ -142,7 +142,7 @@ litsurvey research "QUESTION" [--backend B] [--model M] [--rounds N] [--out FILE
 ```
 
 These need an LLM backend: `--backend cli` (your Claude Code / Codex /
-Gemini subscription CLI; `--model` names the tool), `--backend ollama`
+Antigravity / Gemini subscription CLI; `--model` names the tool), `--backend ollama`
 (local), or `--backend openai` / `anthropic` (API keys). See
 [llm-integration.md](llm-integration.md).
 The model plans keyword queries, calls the search tools, walks citations of
@@ -226,7 +226,7 @@ techrxiv      : OK (2 results)
 researchsquare: OK (2 results)
 iacr          : OK (2 results)
 ollama       : OK at http://localhost:11434 (3 models: qwen3:30b, gemma3:27b, …)
-subscr. CLIs : claude (claude / codex / gemini on PATH)
+subscr. CLIs : claude (claude / codex / agy / gemini on PATH)
 openai       : no key, base https://api.openai.com
 anthropic    : no key
 agent default: backend=ollama model=qwen3:30b (local)
