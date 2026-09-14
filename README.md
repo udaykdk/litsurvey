@@ -1,4 +1,4 @@
-	# litsurvey
+# litsurvey
 
 A research assistant for the literature: ask a question, get a cited
 state-of-the-art survey; state a claim, get a prior-art verdict; give a
