@@ -167,7 +167,11 @@ Things to know:
   accepts.
 - The Claude Code, Codex CLI, and Antigravity CLI paths have all been run end
   to end against the real binaries. The Gemini command follows that tool's
-  documented flags but has not been run; reports welcome.
+  documented flags but has not been run to completion: on the author's
+  machine Gemini CLI stopped at sign-in with an account-eligibility error
+  (`IneligibleTierError`), which reflects that account no longer having
+  Gemini access rather than a fault in the command. If you have a working
+  Gemini account, a report either way is welcome.
 - `--rounds` becomes a command budget for the agent (about three commands
   per round).
 
