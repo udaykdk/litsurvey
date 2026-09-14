@@ -20,10 +20,10 @@ def _add_list_opts(p):
 
 def _add_agent_opts(p):
     p.add_argument("--backend", choices=backends.BACKENDS,
-                   help="LLM backend: cli (your Claude Code / Codex / Gemini subscription CLI), "
+                   help="LLM backend: cli (your Claude Code / Codex / Antigravity / Gemini subscription CLI), "
                         "ollama (local), openai, anthropic. Default: config, else auto-detect "
                         "(local first)")
-    p.add_argument("--model", help="model name; for --backend cli the tool name: claude, codex, gemini or custom")
+    p.add_argument("--model", help="model name; for --backend cli the tool name: claude, codex, agy, gemini or custom")
     p.add_argument("--base-url", metavar="URL",
                    help="for --backend openai: the API root, e.g. https://openrouter.ai/api or http://localhost:1234")
     p.add_argument("--rounds", type=int, default=8, help="max tool-calling rounds (default 8)")
@@ -176,7 +176,7 @@ def cmd_init(args):
     if mail:
         vals["openalex_mailto"] = mail
     print("\nLLM backend for novelty/research (leave blank to auto-detect at run time):")
-    print("  cli       - your subscription's command-line agent: Claude Code, Codex CLI or Gemini CLI")
+    print("  cli       - your subscription's command-line agent: Claude Code, Codex CLI, Antigravity CLI or Gemini CLI")
     print("  ollama    - local model, nothing leaves the machine")
     print("  openai    - OpenAI-compatible API key (OpenAI, LM Studio, vLLM, OpenRouter)")
     print("  anthropic - Anthropic API key")
@@ -186,7 +186,7 @@ def cmd_init(args):
     if (be or cur["backend"]) == "cli":
         found = backends.cli_tools_available()
         print(f"subscription CLIs found on PATH: {', '.join(found) or 'none'}")
-        tool = input(f"CLI tool (claude / codex / gemini / custom) [{cur['cli_tool'] or (found[0] if found else 'claude')}]: ").strip().lower()
+        tool = input(f"CLI tool (claude / codex / agy / gemini / custom) [{cur['cli_tool'] or (found[0] if found else 'claude')}]: ").strip().lower()
         if tool:
             vals["cli_tool"] = tool
         tool = tool or cur["cli_tool"] or (found[0] if found else "claude")
@@ -257,7 +257,7 @@ def cmd_doctor(args):
     except Exception as e:  # noqa: BLE001
         print(f"ollama       : not running ({type(e).__name__}); novelty/research need a backend")
     found = backends.cli_tools_available()
-    print(f"subscr. CLIs : {', '.join(found) if found else 'none found'} (claude / codex / gemini on PATH)")
+    print(f"subscr. CLIs : {', '.join(found) if found else 'none found'} (claude / codex / agy / gemini on PATH)")
     print(f"openai       : {'key set' if cfg['openai_api_key'] else 'no key'}, base {cfg['openai_base_url']}")
     print(f"anthropic    : {'key set' if cfg['anthropic_api_key'] else 'no key'}")
     agent_line = None

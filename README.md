@@ -1,4 +1,4 @@
-	# litsurvey
+# litsurvey
 
 A research assistant for the literature: ask a question, get a cited
 state-of-the-art survey; state a claim, get a prior-art verdict; give a
@@ -31,7 +31,7 @@ choosing which indexes to query (`--sources`), `--debug`, `init` and
   substantially anticipated / cannot determine) with confidence, and
   citations a reviewer can use.
 - Runs on any of: **your subscription's command-line agent** (Claude Code,
-  Codex CLI, Gemini CLI; no API key), **a local model** through Ollama
+  Codex CLI, Antigravity CLI, Gemini CLI; no API key), **a local model** through Ollama
   (nothing leaves the machine), or **a cloud API key** (OpenAI, OpenRouter,
   Anthropic, any OpenAI-compatible server).
 
@@ -155,7 +155,7 @@ sources are queried one after another at the rate limits they ask for;
 | `oa` | no | one DOI to Unpaywall (a title is first resolved through the search APIs) |
 | `history`, `init`, `doctor`, `web` | no | nothing (`doctor` makes one test query per source; actions on the web page follow the rows above) |
 | `novelty`, `research`, local model (Ollama, or an OpenAI-compatible server on localhost) | yes, local | the keyword queries the model composes and the paper ids it looks up, to the scholarly APIs; your text stays on the machine |
-| `novelty`, `research`, subscription CLI (Claude Code, Codex, Gemini) | yes, vendor cloud | your claim or question and everything the agent reads, to that vendor under your subscription (see the note on model and effort below) |
+| `novelty`, `research`, subscription CLI (Claude Code, Codex, Antigravity, Gemini) | yes, vendor cloud | your claim or question and everything the agent reads, to that vendor under your subscription (see the note on model and effort below) |
 | `novelty`, `research`, cloud API key | yes, cloud | your claim or question and every search result, to that provider |
 
 For confidential work (a manuscript under review, an unpublished result)

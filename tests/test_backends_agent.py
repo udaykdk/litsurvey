@@ -210,6 +210,14 @@ Options:
           [possible values: read-only, workspace-write, danger-full-access]
 """
 
+AGY_HELP = """Usage of agy:
+  --dangerously-skip-permissions  Auto-approve all tool permission requests without prompting
+  --effort                        Reasoning effort for the current CLI session (low|medium|high)
+  --model                         Model for the current CLI session
+  --output-format                 Output format for print mode (text, json, stream-json) (default text)
+  -p                              Short alias for --print
+"""
+
 
 def _help(monkeypatch, text):
     monkeypatch.setattr(backends, "_HELP_CACHE", {})
@@ -228,6 +236,8 @@ def test_parse_choices():
         ["low", "medium", "high", "xhigh", "max"]
     assert backends.parse_choices(backends.help_block(CODEX_HELP, "--sandbox")) == \
         ["read-only", "workspace-write", "danger-full-access"]
+    assert backends.parse_choices(backends.help_block(AGY_HELP, "--effort")) == \
+        ["low", "medium", "high"]
     assert backends.parse_choices("no list here (single)") == []
 
 
@@ -247,10 +257,19 @@ def test_probe_codex_falls_back_to_the_known_ladder(monkeypatch):
     assert got["effort"] == "high" and "none" not in got["efforts"]
 
 
+def test_probe_agy_picks_middle_effort(monkeypatch):
+    _help(monkeypatch, AGY_HELP)
+    got = backends.probe("agy")
+    assert got["model"] == ""                  # agy does not advertise its models
+    assert got["efforts"] == ["low", "medium", "high"]
+    assert got["effort"] == "medium"           # middle of the range
+
+
 def test_probe_survives_a_tool_that_says_nothing(monkeypatch):
     _help(monkeypatch, "")
     assert backends.probe("gemini") == {"model": "", "effort": "", "models": [], "efforts": []}
     assert backends.probe("claude")["model"] == ""        # no help text, no flag
+    assert backends.probe("agy")["effort"] == "medium"    # falls back to known ladder
 
 
 def test_cli_command_inserts_model_and_effort(monkeypatch):
@@ -292,6 +311,30 @@ def test_codex_argv_keeps_the_sandbox_escapes(monkeypatch):
     assert argv[argv.index("--add-dir") + 1] == backends.DATA_DIR
     assert "{datadir}" not in " ".join(argv)
     assert "model_reasoning_effort=high" in argv
+
+
+def test_agy_argv_structure_and_effort(monkeypatch):
+    _help(monkeypatch, AGY_HELP)
+    monkeypatch.setattr(backends.shutil, "which", lambda t: "/usr/bin/" + t)
+    for k in ("cli_model", "cli_effort"):
+        monkeypatch.setitem(backends.CFG, k, "")
+    argv, use_stdin = backends.cli_command("agy")
+    assert use_stdin is False
+    assert argv[:2] == ["agy", "--dangerously-skip-permissions"]
+    assert argv[2:4] == ["--effort", "medium"]
+    assert "--output-format" in argv
+    assert "-p" in argv
+    assert "{prompt}" in argv
+
+
+def test_agy_with_configured_model_and_effort(monkeypatch):
+    _help(monkeypatch, AGY_HELP)
+    monkeypatch.setattr(backends.shutil, "which", lambda t: "/usr/bin/" + t)
+    monkeypatch.setitem(backends.CFG, "cli_tool", "agy")
+    monkeypatch.setitem(backends.CFG, "cli_model", "gemini-3.8-flash-high")
+    monkeypatch.setitem(backends.CFG, "cli_effort", "high")
+    argv, use_stdin = backends.cli_command("agy")
+    assert argv[:6] == ["agy", "--dangerously-skip-permissions", "--model", "gemini-3.8-flash-high", "--effort", "high"]
 
 
 def test_run_cli_prefers_the_output_file_over_stdout(monkeypatch, tmp_path):

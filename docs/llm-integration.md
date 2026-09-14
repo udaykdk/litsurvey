@@ -13,7 +13,7 @@ Three ways to supply the model, in the order most people will have them:
 
 | Option | Backend name | Runs where | Setup |
 |---|---|---|---|
-| 1. The command-line agent of a subscription you already pay for: Claude Code (Claude Pro / Max), Codex CLI (ChatGPT), Gemini CLI (Google) | `cli` | the vendor's servers | install the tool, sign in once in a terminal |
+| 1. The command-line agent of a subscription you already pay for: Claude Code (Claude Pro / Max), Codex CLI (ChatGPT), Antigravity CLI (Google), Gemini CLI (Google) | `cli` | the vendor's servers | install the tool, sign in once in a terminal |
 | 2. A local model | `ollama`; or `openai` pointed at a local server (LM Studio, vLLM, llama.cpp) | your machine | install Ollama, `ollama pull <model>`; or `--base-url http://localhost:1234` |
 | 3. An API key for a cloud model | `openai` (OpenAI, OpenRouter, any compatible host), `anthropic` | the provider's servers | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`; `--base-url` or `OPENAI_BASE_URL` for non-OpenAI hosts |
 
@@ -35,8 +35,8 @@ Set a permanent choice with `litsurvey init`, or write the config:
 ### Option 1: your subscription's command-line agent
 
 If you have Claude Pro or Max, ChatGPT Plus or Pro, or a Google account
-with Gemini access, you probably already have (or can install) the matching
-command-line agent: `claude` (Claude Code), `codex` (Codex CLI) or `gemini`
+with Antigravity / Gemini access, you probably already have (or can install) the matching
+command-line agent: `claude` (Claude Code), `codex` (Codex CLI), `agy` (Antigravity CLI) or `gemini`
 (Gemini CLI). These tools are signed in with your subscription, so no API
 key is involved.
 
@@ -50,16 +50,17 @@ so the saved report still ends with a complete search log.
 
 ```bash
 litsurvey novelty "conformal prediction intervals for PINN solutions" --backend cli --model claude --out claim.md
-litsurvey research "..." --backend cli --model gemini
+litsurvey research "..." --backend cli --model agy
 ```
 
-For `--backend cli`, `--model` names the tool: `claude`, `codex`, `gemini`,
-or `custom`. The commands used are:
+For `--backend cli`, `--model` names the tool: `claude`, `codex`, `agy`,
+`gemini`, or `custom`. The commands used are:
 
 | Tool | Command litsurvey runs |
 |---|---|
 | claude | `claude -p --model <model> --effort <effort> --output-format text --allowedTools "Bash(litsurvey:*)"`, prompt on stdin |
 | codex | `codex exec -c model_reasoning_effort=<effort> --skip-git-repo-check --sandbox workspace-write --add-dir ~/.litsurvey -c sandbox_workspace_write.network_access=true -o <tmpfile> "<prompt>"` |
+| agy | `agy --dangerously-skip-permissions --effort <effort> --output-format text -p "<prompt>"` |
 | gemini | `gemini --yolo -o text -p "<prompt>"` |
 | custom | whatever `cli_command` in the config says; `{prompt}` is substituted, otherwise the prompt is passed on stdin. `{datadir}` and `{outfile}` are substituted too, so a custom command can be given the history directory and a file to write its final message to |
 
@@ -79,6 +80,14 @@ report), refuses to start outside a git repository, and cannot write the run
 history under `~/.litsurvey`. `-o <tmpfile>` makes codex write its final
 message to a file; litsurvey reads that instead of stdout, which also
 carries progress and tool-call chatter.
+
+Antigravity CLI (`agy`) runs non-interactively with `--dangerously-skip-permissions`
+so it can execute the `litsurvey` tool commands without prompting for interactive
+confirmation. Unlike Claude Code (which takes `--allowedTools "Bash(litsurvey:*)"`),
+`agy` does not have a command-level tool allow-list. Users who want terminal execution
+restrictions can pass `--sandbox` through a custom command line (`cli_command`). As
+with Codex, the agent runs with access to the shell and reads titles and abstracts
+fetched from the internet; keep this in mind if evaluating untrusted inputs.
 
 ### Which model and how much effort
 
@@ -103,6 +112,7 @@ discovered differs by tool:
 |---|---|---|
 | claude | read from `claude --help` (today: fable, opus, sonnet) → **opus** | read from `claude --help` (low, medium, high, xhigh, max) → **high** |
 | codex | not discoverable; `codex --help` names no models, so codex keeps its own default | not discoverable either, so litsurvey uses a known ladder (minimal … max) → **high** |
+| agy | not discoverable; `agy --help` names no models, so agy keeps its own default | read from `agy --help` (low, medium, high) → **medium** |
 | gemini | not discoverable; gemini keeps its own default | gemini has no effort setting |
 
 Two caveats on the poll. The capability *ranking* is hard-coded, because a
@@ -155,9 +165,9 @@ Things to know:
   used, no longer exists and makes `codex exec` fail outright. If your codex
   rejects a flag, use the `custom` tool with a command line your version
   accepts.
-- The Claude Code and Codex CLI paths have both been run end to end against
-  the real binaries. The Gemini command follows that tool's documented flags
-  but has not been run; reports welcome.
+- The Claude Code, Codex CLI, and Antigravity CLI paths have all been run end
+  to end against the real binaries. The Gemini command follows that tool's
+  documented flags but has not been run; reports welcome.
 - `--rounds` becomes a command budget for the agent (about three commands
   per round).
 

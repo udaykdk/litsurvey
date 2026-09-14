@@ -9,7 +9,7 @@ Keys (all optional):
   openai_base_url   default https://api.openai.com (LM Studio: http://localhost:1234)
   openai_api_key
   anthropic_api_key
-  cli_tool          subscription CLI for the "cli" backend: claude | codex | gemini | custom
+  cli_tool          subscription CLI for the "cli" backend: claude | codex | agy | gemini | custom
   cli_command       custom command line for cli_tool=custom; {prompt} placeholder or prompt on stdin
   cli_model         model the subscription CLI should use; "-" means the tool's own default
   cli_effort        reasoning effort for the subscription CLI; "-" means the tool's own default
