@@ -125,6 +125,38 @@ def test_http_reporter_receives_current_host_and_retry_notes(monkeypatch):
     assert http.friendly("localhost:11434") == "the local model" and http.friendly("x.y") == "x.y"
 
 
+def test_user_agent_sends_contact_only_to_arxiv(monkeypatch):
+    from litsurvey import http
+    monkeypatch.setitem(http.CFG, "openalex_mailto", "me@example.edu")
+    for host in ("export.arxiv.org", "arxiv.org", "ar5iv.labs.arxiv.org"):
+        assert "mailto:me@example.edu" in http.user_agent(host)
+    for host in ("api.openai.com", "api.openalex.org", "api.crossref.org",
+                  "eutils.ncbi.nlm.nih.gov", "api.unpaywall.org", "pypi.org", ""):
+        assert "mailto:" not in http.user_agent(host)
+    monkeypatch.setitem(http.CFG, "openalex_mailto", "")
+    assert "mailto:" not in http.user_agent("export.arxiv.org")
+
+
+def test_get_uses_the_host_specific_user_agent(monkeypatch):
+    from litsurvey import http
+    monkeypatch.setitem(http.CFG, "openalex_mailto", "me@example.edu")
+    seen = []
+
+    class Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def read(self): return b"ok"
+
+    def urlopen(req, timeout=30):
+        seen.append((req.full_url, req.get_header("User-agent")))
+        return Resp()
+    monkeypatch.setattr(http.urllib.request, "urlopen", urlopen)
+    http.get("https://export.arxiv.org/api/query?x=1")
+    http.get("https://api.openai.com/v1/models")
+    assert "mailto:me@example.edu" in seen[0][1]
+    assert "mailto:" not in seen[1][1]
+
+
 def test_throttle_serialises_threads_per_host(tmp_path, monkeypatch):
     import threading
     import time

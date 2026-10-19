@@ -18,8 +18,10 @@ The hosts contacted by a default search are `api.openalex.org`,
 (PubMed), `api.crossref.org` (TechRxiv and Research Square) and
 `eprint.iacr.org`; `--sources europepmc` adds `www.ebi.ac.uk` and `oa` uses
 `api.unpaywall.org`. Each sees the query and your IP address, and — if you
-set `openalex_mailto` — your email address, which OpenAlex, Crossref and
-NCBI use to identify polite callers. None of them is told what you are
+set `openalex_mailto` — your email address: OpenAlex, Crossref, NCBI and
+Unpaywall receive it as a query parameter to identify polite callers, and arXiv
+receives it in the User-Agent, as its API terms ask. The LLM backend and the
+PyPI update check do not receive it. None of them is told what you are
 working on beyond the query itself.
 
 **Agent commands** (`novelty`, `research`) use a language model to plan

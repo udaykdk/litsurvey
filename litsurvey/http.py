@@ -9,14 +9,35 @@ import urllib.parse
 import urllib.request
 
 from . import __version__
-from .config import DATA_DIR, ensure_data_dir
+from .config import CFG, DATA_DIR, ensure_data_dir
 
-USER_AGENT = f"litsurvey/{__version__} (https://github.com/udaykdk/litsurvey)"
+
+def user_agent(host=""):
+    """User-Agent for a request to `host`.
+
+    arXiv asks automated clients to identify themselves with a contact address so
+    they can reach the operator instead of blocking the IP; the configured email
+    is sent there, and only there. OpenAlex, Crossref, NCBI and Unpaywall get the
+    same address as a query parameter, and every other host (including the LLM
+    provider and the PyPI update check) gets just the project URL."""
+    ua = f"litsurvey/{__version__}"
+    contact = (CFG.get("openalex_mailto") or "").strip()
+    if "@" in contact and host in CONTACT_HOSTS:
+        return f"{ua} (mailto:{contact})"
+    return f"{ua} (https://github.com/udaykdk/litsurvey)"
+
+
+# Hosts that ask for a contact address in the User-Agent (arXiv's API terms).
+CONTACT_HOSTS = {"export.arxiv.org", "arxiv.org", "ar5iv.labs.arxiv.org"}
+
+USER_AGENT = user_agent()      # generic form, for callers that have no host
 
 # minimum seconds between requests to a host, per the providers' published limits
 HOST_INTERVAL = {
     "api.semanticscholar.org": 1.1,   # 1 request/second with a key; shared pool without
     "export.arxiv.org": 3.0,          # arXiv asks for 3 s between requests
+    "arxiv.org": 3.0,                 # full-text HTML reads share arXiv's limit
+    "ar5iv.labs.arxiv.org": 3.0,     # the full-text mirror, same courtesy
     "api.openalex.org": 0.15,
     "api.unpaywall.org": 0.2,
     "api.crossref.org": 0.2,
@@ -123,7 +144,7 @@ def get(url, headers=None, timeout=30, retries=5):
     host = urllib.parse.urlparse(url).netloc
     if host == "api.semanticscholar.org" and not (headers or {}).get("x-api-key"):
         retries = min(retries, 2)
-    hdrs = {"User-Agent": USER_AGENT}
+    hdrs = {"User-Agent": user_agent(host)}
     hdrs.update(headers or {})
     last = None
     name = friendly(host)
@@ -166,7 +187,8 @@ def get_json(url, headers=None, timeout=30):
 
 def post_json(url, payload, headers=None, timeout=900):
     """POST a JSON body and return the decoded JSON reply (used for LLM backends)."""
-    hdrs = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
+    host = urllib.parse.urlparse(url).netloc
+    hdrs = {"Content-Type": "application/json", "User-Agent": user_agent(host)}
     hdrs.update(headers or {})
     data = json.dumps(payload).encode("utf-8")
     if DEBUG:

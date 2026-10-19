@@ -163,6 +163,31 @@ def test_openai_base_url_override_and_openrouter_headers(monkeypatch):
     assert out["content"] == "hi"
 
 
+def test_openai_base_url_may_include_v1(monkeypatch):
+    """A base URL that already ends in /v1 must not become /v1/v1/... (#404)."""
+    seen = capture(monkeypatch, {"choices": [{"message": {"content": "hi"}}]})
+    monkeypatch.setitem(backends.CFG, "openai_api_key", "sk-x")
+    for base in ("https://api.goedelmachines.com/v1", "https://api.goedelmachines.com/v1/"):
+        backends.chat("openai", "deepseek-v4.1-flash", MSGS[:2], options={"base_url": base})
+        assert seen["url"] == "https://api.goedelmachines.com/v1/chat/completions"
+    assert backends.openai_v1_url("https://api.openai.com", "/models") == \
+        "https://api.openai.com/v1/models"
+    assert backends.openai_v1_url("https://api.openai.com/v1", "/models") == \
+        "https://api.openai.com/v1/models"
+
+
+def test_openai_models_accepts_v1_base(monkeypatch):
+    seen = {}
+
+    def get_json(url, headers=None, timeout=5):
+        seen["url"] = url
+        return {"data": [{"id": "m"}]}
+    monkeypatch.setattr(backends.http, "get_json", get_json)
+    monkeypatch.setitem(backends.CFG, "openai_api_key", "")
+    assert backends.openai_models("https://api.goedelmachines.com/v1") == ["m"]
+    assert seen["url"] == "https://api.goedelmachines.com/v1/models"
+
+
 def test_hosted_openai_requires_a_model(monkeypatch):
     for k in ("model",):
         monkeypatch.setitem(backends.CFG, k, "")

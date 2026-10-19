@@ -7,7 +7,7 @@ offers a key, and it is optional.
 |---|---|---|---|
 | OpenAlex | search, citation ranking, fallbacks | nothing; an email address gets the faster "polite pool" | works, slightly slower |
 | Semantic Scholar | search, citation graph, recommendations | nothing; a free API key gives a dedicated 1 request/second | works on a shared pool; frequent rate-limit retries, `related` most affected |
-| arXiv | search, full text for the agent | nothing | n/a |
+| arXiv | search, full text for the agent | nothing; the configured email is sent in the User-Agent | n/a |
 | PubMed (NCBI E-utilities) | biomedical search | nothing; the same email identifies polite callers | n/a |
 | Europe PMC (EBI) | opt-in `--sources europepmc` | nothing | n/a |
 | Crossref | TechRxiv and Research Square search | nothing; the same email gets its polite pool | works, slightly slower |

@@ -56,6 +56,19 @@ def is_local(backend, base_url=None):
         return is_loopback_url(base_url or CFG["openai_base_url"])
     return False
 
+
+def openai_v1_url(base, path):
+    """Join a configured OpenAI-compatible base URL with a /v1 API path.
+
+    The base may be given with or without the trailing version segment
+    (https://api.openai.com and https://api.openai.com/v1 are both valid), so the
+    segment is added only when it is not already present. Without this a base
+    that already ends in /v1 would produce /v1/v1/... and a 404."""
+    base = (base or "").rstrip("/")
+    if base.endswith("/v1"):
+        base = base[:-len("/v1")].rstrip("/")
+    return base + "/v1" + path
+
 # Subscription command-line agents. Each is run non-interactively with the task as
 # its prompt; it uses the `litsurvey` command itself as its search tool.
 #
@@ -368,7 +381,8 @@ def ollama_models(host=None):
 
 def openai_models(base=None):
     hdrs = {"Authorization": "Bearer " + CFG["openai_api_key"]} if CFG["openai_api_key"] else {}
-    data = http.get_json((base or CFG["openai_base_url"]) + "/v1/models", headers=hdrs, timeout=5)
+    data = http.get_json(openai_v1_url(base or CFG["openai_base_url"], "/models"),
+                         headers=hdrs, timeout=5)
     return [m["id"] for m in data.get("data", [])]
 
 
@@ -536,7 +550,7 @@ def _chat_openai(model, messages, tools, options=None, timeout=REPLY_MINUTES * 6
     if "openrouter.ai" in base:            # optional attribution headers OpenRouter asks for
         hdrs["HTTP-Referer"] = "https://github.com/udaykdk/litsurvey"
         hdrs["X-Title"] = "litsurvey"
-    resp = http.post_json(base + "/v1/chat/completions", payload, headers=hdrs, timeout=timeout)
+    resp = http.post_json(openai_v1_url(base, "/chat/completions"), payload, headers=hdrs)
     choice = (resp.get("choices") or [{}])[0]
     msg = choice.get("message") or {}
     calls = [{"id": c.get("id") or uuid.uuid4().hex[:12], "name": c["function"]["name"],
